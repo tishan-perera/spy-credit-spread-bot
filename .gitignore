@@ -1,0 +1,10 @@
+data/
+__pycache__/
+.venv/
+.pytest_cache/
+*.egg-info/
+.superpowers/
+
+# private, never published
+CLAUDE.local.md
+.private-patterns

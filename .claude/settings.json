@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__robinhood__place_option_order",
+      "mcp__robinhood__place_equity_order",
+      "mcp__robinhood__place_advanced_order",
+      "mcp__robinhood__place_crypto_order",
+      "mcp__robinhood__cancel_option_order",
+      "mcp__robinhood__cancel_equity_order",
+      "mcp__robinhood__cancel_advanced_order",
+      "mcp__robinhood__cancel_crypto_order",
+      "mcp__robinhood__cancel_option_exercise",
+      "mcp__robinhood__exercise_option",
+      "mcp__robinhood__decline_trade_approval",
+      "mcp__robinhood__review_option_order",
+      "mcp__robinhood__review_equity_order",
+      "mcp__robinhood__review_advanced_order",
+      "mcp__robinhood__preview_crypto_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__place_option_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__place_equity_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__place_advanced_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__place_crypto_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__cancel_option_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__cancel_equity_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__cancel_advanced_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__cancel_crypto_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__cancel_option_exercise",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__exercise_option",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__decline_trade_approval",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__review_option_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__review_equity_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__review_advanced_order",
+      "mcp__54da6bf0-5ad5-4b1a-b2c8-3eb2d921e7d1__preview_crypto_order"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "_about": "Hand-kept facts the dashboard cannot read from files. Everything else on the page is computed. Edit, save, and the page shows it within a minute.",
+  "account": "MCP (dedicated account)",
+  "approveTrades": "OFF",
+  "daily": "Not scheduled — waiting for your approval",
+  "evidenceTargetDays": 60,
+  "tokenBudgetPerDay": 250000,
+  "shadow": {"width": 5, "k": 1.0},
+  "scheduled": [
+    {"day": "2026-11-18", "hhmm": "1015", "when": "2026-11-18T10:10:00-05:00", "what": "Logger test, first run"},
+    {"day": "2026-11-18", "hhmm": "1530", "when": "2026-11-18T15:25:00-05:00", "what": "Logger test, 3:30 run"},
+    {"day": "2026-11-19", "hhmm": "1015", "when": "2026-11-19T10:10:00-05:00", "what": "Test of the first run of the day (with contract listing)"}
+  ],
+  "stages": [
+    {"n": 1, "name": "Logging only", "state": "now", "note": "Price test built; logger being tested"},
+    {"n": 2, "name": "Backtest proves the edge", "state": "blocked", "note": "Needs paid data to fully pass; free version can only rule ideas out"},
+    {"n": 3, "name": "Paper trading (30–60 days)", "state": "later", "note": ""},
+    {"n": 4, "name": "Live, approve each trade", "state": "later", "note": ""},
+    {"n": 5, "name": "Fully automatic", "state": "later", "note": ""}
+  ],
+  "decisions": [
+    {"title": "Approve the 5 daily logger runs", "why": "After tomorrow's 10:15 test passes. Each run is a scheduled Claude task; the Mac must be awake.", "urgent": true},
+    {"title": "Update CLAUDE.md 'Current work' to the new plan", "why": "It still points at the old Phase A plan, so a fresh session could follow the wrong plan.", "urgent": false},
+    {"title": "Merge the price-test branch into main", "why": "All tests pass. Until merged, main holds the old code.", "urgent": false},
+    {"title": "Set the evidence target (days of logging)", "why": "60 is a placeholder. More days means a surer verdict but a longer wait.", "urgent": false},
+    {"title": "Account size vs. $5 width", "why": "Account cash is small: one $5-wide max loss is about $475, far above plan v2's 1–2% limit. Matters only before live trading.", "urgent": false}
+  ]
+}

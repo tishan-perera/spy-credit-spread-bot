@@ -1,0 +1,10 @@
+[project]
+name = "spybot"
+version = "0.1.0"
+description = "SPY credit-spread research bot: price test (backtest) and read-only option-quote logger"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"

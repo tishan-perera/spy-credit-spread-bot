@@ -1,0 +1,9 @@
+{
+  "notes": "Daily bars from Robinhood that are clearly wrong (value far from both neighbours, not a real market move). Found by check-history on 2026-11-17 and reviewed by eye. Excluded from the price test; those days count as missing. Replace with a full Cboe cross-check when allowed.",
+  "VIX": {
+    "2023-01-09": "open 75.87 / close 77.27 between ~21.9 and ~20.6",
+    "2023-11-02": "open 83.91 / close 83.24 between ~15.7 and ~14.9",
+    "2025-05-07": "open 14.05 / close 14.02 between ~24.8 and ~22.5"
+  },
+  "SPY": {}
+}
