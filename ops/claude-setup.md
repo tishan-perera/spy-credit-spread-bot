@@ -11,9 +11,13 @@ The bot's "agents" are Claude Code sessions. This page lists everything outside 
 | superpowers plugin | Working method used to build the project: brainstorm → design → plan → test-first build → review | Claude plugin marketplace |
 | Project rules | `CLAUDE.md` (published) and `CLAUDE.local.md` (private, git-ignored) | This repo |
 | Project permissions | `.claude/settings.json`: blocks every order tool | This repo |
+| Dashboard service | Read-only status page at http://127.0.0.1:8790, run by macOS as a background service so it survives idle chats and Claude app updates | `sh ops/dashboard-service.sh install` (also `status`, `uninstall`); log in `~/Library/Logs/spybot-dashboard.log` |
 | Scheduled logger runs | One-time or daily Claude tasks that follow `collector/logger-task.md` | Claude app → Scheduled; prompts kept in [scheduled-tasks/](scheduled-tasks/) |
 
 Code never talks to Robinhood directly. A Claude session calls the read tools, writes the answer to `data/raw/`, and plain Python (`spybot`) checks and scores it.
+
+## Dashboard
+Started from a Claude chat, the dashboard is stopped whenever that chat sits idle for 30 minutes or the app updates itself (seen 2026-11-19). So it runs as a macOS background service instead: it starts at login and restarts within about 30 seconds if it stops. `.claude/launch.json` only opens the page; it does not start a second copy.
 
 ## The no-orders safety net (four layers)
 
