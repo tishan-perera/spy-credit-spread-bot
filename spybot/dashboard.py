@@ -276,11 +276,13 @@ def _summary(s) -> dict:
             "full": _r(s.full_loss_rate), "n": s.n_traded, "skip": s.n_skipped, "streak": s.worst_streak}
 
 
-def trading_panels(root: Path, pt: dict, manual: dict) -> dict:
+def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None) -> dict:
     sweeps, val = pt["sweeps"], pt["sweeps"]["validation"]
     width, k = manual.get("shadow", {}).get("width", 5), manual.get("shadow", {}).get("k", 1.0)
     logged = sorted(date.fromisoformat(p.name) for p in (Path(root) / "data" / "snapshots").glob("*")
                     if (p / "1015.json").exists())
+    if today is not None:                           # never show days after the "as of" date
+        logged = [d for d in logged if d <= today]
     per_day = {d: _real_rows(root, d, pt) for d in logged}
 
     points, credits, gaps_in, gaps_out = [], [], {}, {}
@@ -403,7 +405,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
     today = now.date()
     manual = load_manual(root)
     pt = pt or price_test(root)
-    tp = trading_panels(root, pt, manual)
+    tp = trading_panels(root, pt, manual, today)
     runs = logger_runs(root)
     scheduled = manual.get("scheduled", [])
     nxt = next_run(scheduled, now)

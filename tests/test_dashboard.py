@@ -164,3 +164,13 @@ def test_copied_session_does_not_double_count_tool_calls(tmp_path):
     (tmp_path / "b.jsonl").write_text(block("toolu_1"))        # a forked copy of the same session
     a = dashboard.scan_transcripts(tmp_path)
     assert (a["toolCalls"], a["previewCalls"]) == (1, 1)
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "snapshots" / "2026-11-19").exists(), reason="no Nov 19 log")
+def test_as_of_date_hides_later_logged_days(tmp_path):
+    def shadow_day(day):
+        s = dashboard.collect(ROOT, datetime(2026, 11, day, 16, 52, tzinfo=ET),
+                              tests={"passed": 1, "failed": 0}, transcripts=tmp_path)
+        return s["shadow"]["day"]
+    assert shadow_day(18) == dashboard._short(date(2026, 11, 18))
+    assert shadow_day(19) == dashboard._short(date(2026, 11, 19))
