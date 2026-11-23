@@ -10,7 +10,9 @@ Each logger run is a scheduled task in the Claude desktop app (Scheduled section
 | 15:30 | `1530` | Exit-time snapshot |
 | 15:40 | `1540` | Fallback exit snapshot |
 
-Status (2026-11-18): only one-time **test** runs have been made so far. The five daily runs wait for the owner's approval. Their prompt is [daily-logger.md](daily-logger.md).
+Status (2026-11-23): the five daily runs are scheduled (owner approved 2026-11-23), weekdays, task IDs `spy-logger-1000` … `spy-logger-1540`, saved in Auto mode, no completion notifications (results show on the dashboard). Their prompt is [daily-logger.md](daily-logger.md).
+
+The app adds a fixed per-task delay to recurring tasks (seen: 2 to 13 minutes), so the cron times were set so each run actually starts 8 to 10 minutes before its label: 9:50, 10:05, 10:22, 15:22 and 15:30 ET. Each run waits until 2 minutes before its label for the quotes. Holidays are skipped and early-close days skip the afternoon runs, using `spybot.calendar`.
 
 How to create one:
 1. Claude app → Scheduled → new task (or ask a session to create it).
