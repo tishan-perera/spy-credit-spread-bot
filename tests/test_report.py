@@ -49,6 +49,8 @@ def tmp_root_with_log(tmp_root):
     raw.mkdir(parents=True)
     good = json.loads((FIX / "logger" / "good_1507.json").read_text())
     good["run_et"] = "2026-11-17T10:15:30-05:00"           # a real 10:15 run
+    good["spy"]["data"]["results"][0]["quote"]["venue_last_trade_time"] = "2026-11-17T15:15:25Z"
+    good["vix"]["data"]["quotes"][0]["updated_at"] = "2026-11-17T10:15:30-05:00"  # stamps set the run time
     template = good["quotes"][0]["data"]["results"][0]
     template["quote"]["updated_at"] = "2026-11-17T15:15:20Z"
     good["instruments"], results = {}, []

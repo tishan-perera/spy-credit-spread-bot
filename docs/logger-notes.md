@@ -45,3 +45,10 @@ If an answer is not saved to a file (under ~100k characters), a run costs about 
   - All out-of-the-money legs (the ones the strategy would use) passed every check.
 - Margin is thin: 104k vs a ~100k save size. Days with fewer listed strikes could fall back to inline.
 - Fixes (after the 15:30 test): the strike-label check now uses `adjusted_mark_price` (ask only for older files without it); in-the-money legs may lack implied volatility and delta (all prices, sizes and timestamps are still required); re-checking a run replaces its earlier good/bad outcome. In-the-money contracts are **kept**, not dropped: on a losing day the 10:15 short leg is in the money at 3:30, and its 3:30 price is exactly what the report needs. Re-checked the real 1015 and 1530 files: both ok (1530: 146 legs, 43 without greeks).
+
+## Morning runs rejected, 2026-11-24 (root cause and fix)
+
+- All three morning runs (10:00, 10:15, 10:30) collected all 240 contracts but were marked **BAD**: one contract, the 769 call (about $50 above SPY), had a quote 28, 44 and 59 minutes "old".
+- Root cause 1: Robinhood's `updated_at` is the time the bid, ask or sizes **last changed**, not when the quote was served. Across the three runs, 239 contracts changed and had fresh stamps; the 769 call ($0 bid / $0.01 ask, 1,377 offered) never changed and kept its 9:30:01 stamp, while its implied volatility and delta were still recalculated. No contract had an unchanged quote with a refreshed stamp. The 60-second rule assumed the opposite and let one worthless contract reject a whole run.
+- Root cause 2 (2026-11-23 3:30 run): `run_et` was noted by hand before the 240-id request, which takes 50-70 s to send, so every quote looked 61-72 s old. Today's 10:00 run was 53 s off.
+- Fix (owner approved): the run time comes from Robinhood's SPY/VIX stamps (hand-noted time only as a fallback); a single stale contract is left out and listed under `dropped` in the snapshot (its strike reads "not logged"); more than 5% stale still rejects the run.

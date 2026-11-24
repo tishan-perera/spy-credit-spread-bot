@@ -44,6 +44,7 @@ HISTORY_START = date(2022, 1, 3)
 
 # Logger checks
 STALE_QUOTE_SEC = 60
+STALE_DROP_MAX_SHARE = 0.05   # up to 5% of contracts may be dropped as stale; more rejects the run
 
 # SPY Tuesday expiries were first listed 2022-11-14 (first expiry Tue 2022-11-15);
 # Thursday expiries were first listed 2022-11-16 (first expiry Thu 2022-11-17).

@@ -11,10 +11,12 @@ import re
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from spybot import config
 
 LABEL_TOLERANCE_MIN = 5          # a run more than 5 minutes from its label is not that run
+ET = ZoneInfo(config.MARKET_TZ)
 
 GREEK_FIELDS = ("implied_volatility", "delta")
 LEG_FIELDS = ("bid_price", "ask_price", "bid_size", "ask_size", "mark_price",
@@ -42,6 +44,7 @@ class Snapshot:
     spy: float
     vix: float
     legs: dict[tuple[str, int], Leg]
+    dropped: tuple[str, ...] = ()   # "put:703 stale quote (...)": left out, so the strike reads "not logged"
 
 
 def _opt_float(v):
@@ -55,10 +58,36 @@ def parse_ts(text: str) -> datetime:
     return datetime.fromisoformat(text)
 
 
+def quote_time(raw: dict) -> datetime | None:
+    """When the quotes were taken, from Robinhood's own SPY and VIX stamps (the newest one).
+
+    The session's hand-noted run_et can be a minute early (it is written before the long quote
+    request), so these machine stamps are used whenever they are present."""
+    stamps = []
+    try:
+        q = raw["spy"]["data"]["results"][0]["quote"]
+        stamps += [q.get(k) for k in ("venue_last_trade_time", "venue_bid_time", "venue_ask_time")]
+    except (KeyError, IndexError, TypeError):
+        pass
+    try:
+        stamps.append(raw["vix"]["data"]["quotes"][0].get("updated_at"))
+    except (KeyError, IndexError, TypeError):
+        pass
+    times = []
+    for s in stamps:
+        if s:
+            try:
+                times.append(parse_ts(s))
+            except ValueError:
+                pass
+    return max(times) if times else None
+
+
 def parse(raw: dict) -> tuple[Snapshot | None, list[str]]:
     problems: list[str] = []
+    stale: list[tuple[tuple[str, int], str]] = []
     try:
-        run_at = parse_ts(raw["run_et"])
+        run_at = (quote_time(raw) or parse_ts(raw["run_et"])).astimezone(ET)
         day = run_at.date()
         if raw["expiry"] != day.isoformat():
             problems.append(f"expiry {raw['expiry']} is not the run day {day}")
@@ -99,12 +128,19 @@ def parse(raw: dict) -> tuple[Snapshot | None, list[str]]:
         if leg.bid > leg.ask:
             problems.append(f"{iid}: bid > ask ({leg.bid} > {leg.ask})")
         age = abs((leg.updated_at - run_at).total_seconds())
+        key = (inst["type"], int(round(float(inst["strike"]))))
         if age > config.STALE_QUOTE_SEC:
-            problems.append(f"{iid}: stale quote ({age:.0f}s from run time)")
-        legs[(inst["type"], int(round(float(inst["strike"]))))] = leg
+            stale.append((key, f"{iid}: stale quote ({age:.0f}s from run time)"))
+            continue
+        legs[key] = leg
+    # A single old quote is usually a far-away $0/$0.01 offer that has not changed (Robinhood stamps the
+    # last bid/ask change), so that contract is left out. Many old quotes mean the batch itself is bad.
+    if stale and len(stale) > config.STALE_DROP_MAX_SHARE * len(quotes):
+        problems += [msg for _, msg in stale]
     if problems:
         return None, problems
-    return Snapshot(day, run_at.time().replace(tzinfo=None), spy, vix, legs), []
+    dropped = tuple(f"{t}:{k} {msg}" for (t, k), msg in stale)
+    return Snapshot(day, run_at.time().replace(tzinfo=None), spy, vix, legs, dropped), []
 
 
 def _snap_dir(root: Path, day: date) -> Path:
@@ -114,7 +150,8 @@ def _snap_dir(root: Path, day: date) -> Path:
 def _to_json(snap: Snapshot) -> dict:
     return {"day": snap.day.isoformat(), "run": snap.run.isoformat(), "spy": snap.spy, "vix": snap.vix,
             "legs": {f"{t}:{k}": {**asdict(leg), "updated_at": leg.updated_at.isoformat()}
-                     for (t, k), leg in snap.legs.items()}}
+                     for (t, k), leg in snap.legs.items()},
+            "dropped": list(snap.dropped)}
 
 
 def _from_json(d: dict) -> Snapshot:
@@ -122,7 +159,8 @@ def _from_json(d: dict) -> Snapshot:
     for key, v in d["legs"].items():
         t, k = key.split(":")
         legs[(t, int(k))] = Leg(**{**v, "updated_at": datetime.fromisoformat(v["updated_at"])})
-    return Snapshot(date.fromisoformat(d["day"]), time.fromisoformat(d["run"]), d["spy"], d["vix"], legs)
+    return Snapshot(date.fromisoformat(d["day"]), time.fromisoformat(d["run"]), d["spy"], d["vix"], legs,
+                    tuple(d.get("dropped", ())))
 
 
 def ingest(root: Path, day: date, hhmm: str) -> list[str]:

@@ -22,7 +22,8 @@ def set_first_quote(raw, bid, ask):
 def test_good_file_parses_all_fields():
     snap, problems = ingest.parse(load("good_1507.json"))
     assert problems == []
-    assert (snap.day, snap.run, snap.spy, snap.vix) == (DAY, time(15, 7, 30), 729.825, 26.79)
+    assert (snap.day, snap.run.replace(microsecond=0), snap.spy, snap.vix) == (DAY, time(15, 7, 35), 729.825, 26.79)
+    # run time = newest Robinhood stamp (SPY trade 20:07:35Z), not the hand-noted 15:07:30
     leg = snap.legs[("put", 726)]
     assert (leg.bid, leg.ask, leg.bid_size, leg.ask_size) == (0.47, 0.48, 399, 276)
     assert (leg.mark, leg.delta, leg.open_interest, leg.volume) == (0.475, -0.193903, 1972, 214499)
@@ -241,3 +242,93 @@ def test_reingest_replaces_the_previous_outcome(tmp_path):
     _write_raw_obj(tmp_path, raw, "1507")
     assert ingest.ingest(tmp_path, DAY, "1507") != []
     assert [p.name for p in folder.iterdir()] == ["1507.bad.json"]
+
+
+# --- Robinhood stamps decide the run time (2026-11-24 root cause: hand-noted time was ~70 s early) ---
+
+def test_run_time_comes_from_robinhood_stamps_not_the_noted_time():
+    raw = load("good_1507.json")
+    raw["run_et"] = "2026-11-17T15:06:20-05:00"     # noted 75 s before the quotes were taken
+    snap, problems = ingest.parse(raw)
+    assert problems == []
+    assert snap.run.replace(microsecond=0) == time(15, 7, 35)
+
+
+def test_run_time_falls_back_to_noted_time_without_stamps():
+    raw = load("good_1507.json")
+    del raw["spy"]["data"]["results"][0]["quote"]["venue_last_trade_time"]
+    del raw["vix"]["data"]["quotes"][0]["updated_at"]
+    snap, problems = ingest.parse(raw)
+    assert problems == []
+    assert snap.run == time(15, 7, 30)
+
+
+def test_run_time_is_eastern_even_from_utc_stamps(tmp_path):
+    raw = load("good_1507.json")
+    raw["run_et"] = "2026-11-17T15:05:00-05:00"
+    _write_raw_obj(tmp_path, raw, "1507")
+    assert ingest.ingest(tmp_path, DAY, "1507") == []   # 15:07:35 ET is within 5 min of label 1507
+
+
+# --- one stale contract is dropped, not fatal (2026-11-24 root cause: a $0/$0.01 quote that never
+#     changes keeps its old updated_at, because Robinhood stamps the last bid/ask change) ---
+
+def _many_legs(n_extra=20):
+    """good_1507 plus n_extra out-of-the-money puts (strikes 700, 701, ...) cloned from the 726 put."""
+    raw = load("good_1507.json")
+    block = raw["quotes"][0]["data"]["results"]
+    base_id = block[0]["quote"]["instrument_id"]
+    assert raw["instruments"][base_id] == {**raw["instruments"][base_id], "type": "put", "strike": 726.0}
+    for i in range(n_extra):
+        strike, iid = 700.0 + i, f"clone-{i}"
+        q = copy.deepcopy(block[0])
+        q["quote"]["instrument_id"] = iid
+        mark = float(q["quote"].get("adjusted_mark_price") or q["quote"]["ask_price"])
+        q["quote"]["break_even_price"] = f"{strike - mark:.6f}"
+        block.append(q)
+        raw["instruments"][iid] = {**raw["instruments"][base_id], "strike": strike}
+    return raw
+
+
+def _age_quote(raw, iid, minutes):
+    from datetime import timedelta
+    for b in raw["quotes"]:
+        for r in b["data"]["results"]:
+            if r["quote"]["instrument_id"] == iid:
+                t = ingest.parse_ts(r["quote"]["updated_at"]) - timedelta(minutes=minutes)
+                r["quote"]["updated_at"] = t.isoformat()
+
+
+def test_one_stale_contract_is_dropped_and_listed():
+    raw = _many_legs()
+    _age_quote(raw, "clone-3", 30)                 # the 703 put, unchanged for 30 minutes
+    snap, problems = ingest.parse(raw)
+    assert problems == []
+    assert ("put", 703) not in snap.legs
+    assert ("put", 702) in snap.legs and ("put", 726) in snap.legs
+    assert len(snap.dropped) == 1
+    assert snap.dropped[0].startswith("put:703") and "stale" in snap.dropped[0]
+
+
+def test_good_file_drops_nothing():
+    snap, _ = ingest.parse(load("good_1507.json"))
+    assert snap.dropped == ()
+
+
+def test_too_many_stale_contracts_reject_the_whole_run():
+    raw = _many_legs()                             # 24 contracts; 5% allows 1, not 2
+    _age_quote(raw, "clone-3", 30)
+    _age_quote(raw, "clone-4", 30)
+    snap, problems = ingest.parse(raw)
+    assert snap is None
+    assert any("stale" in p for p in problems)
+
+
+def test_dropped_contracts_are_saved_with_the_snapshot(tmp_path):
+    raw = _many_legs()
+    _age_quote(raw, "clone-3", 30)
+    _write_raw_obj(tmp_path, raw, "1507")
+    assert ingest.ingest(tmp_path, DAY, "1507") == []
+    saved = json.loads((tmp_path / "data" / "snapshots" / DAY.isoformat() / "1507.json").read_text())
+    assert len(saved["dropped"]) == 1 and saved["dropped"][0].startswith("put:703")
+    assert ingest.load_snapshot(tmp_path, DAY, "1507").dropped == tuple(saved["dropped"])
