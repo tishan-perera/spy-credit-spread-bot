@@ -1,164 +1,290 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SPY Bot Control</title>
+<title>SPY Bot Dashboard</title>
 <style>
-:root{--bg:#0b0e12;--panel:#121820;--line:#1f2a36;--grid:#1a232e;--ink:#d8e1ea;--muted:#7a8a9a;--green:#3ddc84;--amber:#ffb547;--red:#ff5c5c;--blue:#5cb8ff;--violet:#9d8cff;--empty:#18202a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 "SF Mono",Menlo,Consolas,monospace}
-header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px}
-header b{letter-spacing:.15em}.muted,.sub{color:var(--muted)}
-nav{display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--line);overflow-x:auto}
-nav button{background:none;border:1px solid transparent;border-bottom:none;color:var(--muted);font:inherit;letter-spacing:.12em;padding:8px 14px;cursor:pointer;border-radius:5px 5px 0 0;white-space:nowrap}
-nav button.on{color:var(--ink);background:var(--panel);border-color:var(--line)}
-nav button .n{display:inline-block;min-width:16px;margin-left:6px;padding:0 4px;border-radius:8px;background:var(--amber);color:#000;font-size:10px}
+@font-face{font-family:"Inter";font-weight:400;src:url(/static/fonts/Inter-Regular.ttf) format("truetype");font-display:swap}
+@font-face{font-family:"Inter";font-weight:500;src:url(/static/fonts/Inter-Medium.ttf) format("truetype");font-display:swap}
+@font-face{font-family:"Inter";font-weight:600;src:url(/static/fonts/Inter-SemiBold.ttf) format("truetype");font-display:swap}
+@font-face{font-family:"JetBrains Mono";font-weight:400;src:url(/static/fonts/JetBrainsMono-Regular.ttf) format("truetype");font-display:swap}
+@font-face{font-family:"JetBrains Mono";font-weight:500;src:url(/static/fonts/JetBrainsMono-Medium.ttf) format("truetype");font-display:swap}
+:root{
+ --navy:#0B1F33;--teal:#14B8A6;--amber:#F59E0B;--paper:#F8FAFC;--surface:#FFFFFF;
+ --border:rgba(11,31,51,.12);--text:var(--navy);--text-2:rgba(11,31,51,.70);--text-3:rgba(11,31,51,.50);
+ --teal-soft:rgba(20,184,166,.12);--teal-line:rgba(20,184,166,.40);--amber-soft:rgba(245,158,11,.14);--amber-line:rgba(245,158,11,.50);
+ --navy-soft:rgba(11,31,51,.06);--navy-mid:rgba(11,31,51,.30);
+ --err:#B42318; /* only for small failure labels: an order placed, a failed run, failing tests */
+ --font-sans:"Inter",system-ui,sans-serif;--font-mono:"JetBrains Mono",ui-monospace,monospace;--radius:12px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--text);font:400 14px/1.5 var(--font-sans)}
+.topbar{height:6px;background:var(--navy);display:flex}.topbar i{flex:1}.topbar b{width:64px;background:var(--teal)}.topbar em{width:16px;background:var(--amber)}
+header{max-width:1240px;margin:0 auto;padding:24px 16px 0;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+h1{font-size:22px;font-weight:600;margin:0}
+.sub{color:var(--text-2)}.s3{color:var(--text-3)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+nav{max-width:1240px;margin:16px auto 0;padding:0 16px;display:flex;gap:24px;border-bottom:1px solid var(--border);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font:500 14px var(--font-sans);padding:10px 0;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:8px}
+nav button.on{color:var(--navy);border-bottom-color:var(--teal)}
+nav .n{font:500 11px var(--font-mono);min-width:18px;padding:0 6px;border-radius:999px;background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--navy)}
 .tab{display:none}.tab.on{display:block}
-.grid{display:grid;gap:12px;padding:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
-@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr}}
-.p{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;min-width:0}
-.p h3{margin:0 0 10px;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:500}
+.grid{max-width:1240px;margin:0 auto;display:grid;gap:16px;padding:24px 16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
 .span2{grid-column:span 2}.span3{grid-column:span 3}.span4{grid-column:1/-1}
-@media(max-width:900px){.span3,.span4{grid-column:1/-1}}@media(max-width:560px){.span2{grid-column:auto}}
-.big{font-size:30px;font-weight:600}
-.g{color:var(--green)}.a{color:var(--amber)}.r{color:var(--red)}.b{color:var(--blue)}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;box-shadow:0 0 8px currentColor;background:currentColor}
-.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}.row:last-child{border:0}
-.stages{display:flex;gap:6px;flex-wrap:wrap}.st{flex:1;min-width:120px;padding:9px;border:1px solid var(--line);border-radius:4px;color:var(--muted);font-size:11px}
-.st.now{border-color:var(--green);color:var(--green);background:#0f2a1c}.st.blocked{border-color:var(--amber);color:var(--amber)}
-.alert{padding:9px 12px;border:1px solid;border-radius:5px;margin-bottom:6px}.alert.amber{border-color:#6b4a14;background:#21190b;color:var(--amber)}.alert.red{border-color:#6b1f1f;background:#220d0d;color:var(--red)}
-svg text{fill:var(--muted);font:11px "SF Mono",Menlo,monospace}
-.key{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:6px}.key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.cal{display:grid;grid-template-columns:52px repeat(5,1fr);gap:4px;align-items:center}
-.cal .h{font-size:11px;color:var(--muted);text-align:center}.cal .d{font-size:11px;color:var(--muted)}
-.cell{height:26px;border-radius:3px;background:var(--empty);display:grid;place-items:center;font-size:11px;color:#3a4654;cursor:default}
-.cell.ok{background:#14532d;color:var(--green);box-shadow:inset 0 0 0 1px #1f7a44}
-.cell.bad,.cell.missed{background:#3b1212;color:var(--red);box-shadow:inset 0 0 0 1px #7a1f1f}
-.cell.next{outline:1px dashed var(--amber);color:var(--amber)}
-.q{display:inline-grid;place-items:center;width:15px;height:15px;border:1px solid var(--muted);border-radius:50%;font-size:9px;color:var(--muted);margin-left:6px;cursor:help;vertical-align:1px}
-.bar{height:8px;background:var(--empty);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--blue)}
-.inbox .item{padding:9px 0;border-bottom:1px dashed var(--line)}.inbox .item:last-child{border:0}.inbox .why{color:var(--muted);font-size:12px;margin:3px 0 0 18px}
-table{width:100%;border-collapse:collapse}td,th{padding:6px 4px;border-bottom:1px dashed var(--line);text-align:right}td:first-child,th:first-child{text-align:left}th{color:var(--muted);font-weight:500;font-size:11px}
-select{background:var(--empty);color:var(--ink);border:1px solid var(--line);border-radius:4px;font:inherit;padding:6px 8px}
-.ctl{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}@media(max-width:560px){.stat{grid-template-columns:1fr 1fr}}
-.stat div{background:var(--empty);border-radius:5px;padding:10px}.stat b{display:block;font-size:20px;margin-top:2px}
-pre{margin:0;white-space:pre-wrap;color:var(--muted)}
+@media(max-width:1000px){.span3,.span4{grid-column:1/-1}}@media(max-width:600px){.span2{grid-column:auto}}
+.p{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.p h3{margin:0;font-size:13px;font-weight:500;color:var(--text-2);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.p h3 .t{display:flex;align-items:center;gap:6px}
+.section{grid-column:1/-1;font-size:16px;font-weight:500;margin:8px 0 -8px}
+.big{font:500 30px/1.15 var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.mid{font:500 20px var(--font-mono);font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border)}
+.row>span:last-child:not(:first-child){text-align:right}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.foot{margin-top:auto;padding-top:4px;font-size:12px;color:var(--text-3)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:500 12px var(--font-mono);border:1px solid var(--border);background:var(--surface);color:var(--text-2);white-space:nowrap}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--navy-mid)}
+.chip.ok{background:var(--teal-soft);border-color:var(--teal-line);color:var(--navy)}.chip.ok i{background:var(--teal)}
+.chip.human{background:var(--amber-soft);border-color:var(--amber-line);color:var(--navy)}.chip.human i{background:var(--amber)}
+.chip.err{color:var(--err);border-color:rgba(180,35,24,.35)}.chip.err i{background:var(--err)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--navy-mid);vertical-align:1px}
+.dot.ok{background:var(--teal)}.dot.err{background:var(--err)}.dot.human{background:var(--amber)}
+.errtxt{color:var(--err);font-weight:500}
+.q{display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid var(--border);border-radius:50%;font:500 10px var(--font-sans);color:var(--text-3);cursor:help}
+.stages{display:flex;gap:8px;flex-wrap:wrap}
+.st{flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-2);font-size:13px;display:flex;flex-direction:column;gap:4px}
+.st b{font-weight:500;color:var(--navy)}
+.st.now{border-color:var(--teal-line);background:var(--teal-soft)}.st.blocked{border-color:var(--amber-line);background:var(--amber-soft)}
+.alert{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:8px;color:var(--navy)}
+.alert.red{border-left:3px solid var(--err)}.alert.amber{border-left:3px solid var(--amber)}
+svg text{font:11px var(--font-mono);fill:var(--text-3)}
+.key{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-2)}.key i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:3px;border-radius:2px}
+.cal{display:grid;grid-template-columns:56px repeat(5,1fr);gap:4px;align-items:center}
+.cal .h{font:11px var(--font-mono);color:var(--text-3);text-align:center}.cal .d{font:12px var(--font-mono);color:var(--text-2)}
+.cell{height:28px;border-radius:6px;background:var(--navy-soft);display:grid;place-items:center;font:500 12px var(--font-mono);color:var(--text-3);cursor:default}
+.cell.ok{background:var(--teal-soft);box-shadow:inset 0 0 0 1px var(--teal-line);color:var(--navy)}
+.cell.bad,.cell.missed{background:var(--surface);box-shadow:inset 0 0 0 1px rgba(180,35,24,.45);color:var(--err)}
+.cell.next{background:var(--surface);box-shadow:inset 0 0 0 1px var(--navy-mid);color:var(--navy);border:1px dashed var(--navy-mid)}
+.meter{height:8px;background:var(--navy-soft);border-radius:4px;overflow:hidden}.meter i{display:block;height:100%;background:var(--teal)}
+.inbox .item{padding:10px 0;border-top:1px solid var(--border)}.inbox .why{color:var(--text-2);font-size:13px;margin:2px 0 0 16px}
+table{width:100%;border-collapse:collapse}td,th{padding:8px 4px;border-top:1px solid var(--border);text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+td:first-child,th:first-child{text-align:left;font-family:var(--font-sans)}th{color:var(--text-3);font:500 12px var(--font-sans)}
+select{background:var(--surface);color:var(--navy);border:1px solid var(--border);border-radius:8px;font:inherit;padding:6px 10px}
+.ctl{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}@media(max-width:600px){.stat{grid-template-columns:1fr 1fr}}
+.stat div{background:var(--navy-soft);border-radius:8px;padding:12px;font-size:12px;color:var(--text-2)}.stat b{display:block;font:500 22px var(--font-mono);color:var(--navy);margin-top:2px}
+.log{font:12px/1.7 var(--font-mono);color:var(--text-2);white-space:pre-wrap;margin:0}
+.notice{grid-column:1/-1;display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:12px 16px;color:var(--text-2)}
+.notice b{color:var(--navy);font-weight:500}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:600px){.days{grid-template-columns:repeat(2,1fr)}}
+.day{border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;display:flex;flex-direction:column;gap:2px;color:var(--text-2)}
+.day.done{background:var(--teal-soft);border-color:var(--teal-line)}.day .v{font:500 15px var(--font-mono);color:var(--navy)}
+.gauge{position:relative;height:56px;margin:4px 0}
+.gauge .track{position:absolute;left:0;right:0;top:22px;height:8px;border-radius:4px;background:var(--navy-soft)}
+.gauge .need{position:absolute;top:14px;width:2px;height:24px;background:var(--navy)}
+.gauge .real{position:absolute;top:18px;width:16px;height:16px;border-radius:50%;background:var(--teal);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--teal);transform:translateX(-8px)}
+.gauge .lab{position:absolute;font:11px var(--font-mono);color:var(--text-3);transform:translateX(-50%);white-space:nowrap}
+.xgrid{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:1000px){.xgrid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.xgrid{grid-template-columns:1fr}}
+.xgrid .p{background:var(--paper)}
 </style></head><body>
-<header><b>SPY·BOT // CONTROL</b><span class="muted" id="clock">loading…</span></header>
+<div class="topbar"><i></i><b></b><em></em></div>
+<header><div><h1>SPY credit-spread bot</h1><div class="sub" id="clock">loading…</div></div><span class="chip ok"><i></i>read-only · no orders</span></header>
 <nav id="nav"></nav>
 <section class="tab" id="t-overview"><div class="grid" id="overview"></div></section>
+<section class="tab" id="t-profit"><div class="grid" id="profit"></div></section>
 <section class="tab" id="t-evidence"><div class="grid" id="evidence"></div></section>
 <section class="tab" id="t-safety"><div class="grid" id="safety"></div></section>
 <section class="tab" id="t-explorer"><div class="grid" id="explorer"></div></section>
 <script>
 // Live page: every number comes from /api/status, built from the project's files. Read-only.
-const money=v=>v==null?'–':(v<0?'-':'')+'$'+Math.abs(v).toFixed(2);
-const sgn=v=>v==null?'–':(v>=0?'+':'-')+'$'+Math.abs(v).toFixed(2);
-const light=ok=>`<span class="dot ${ok?'g':'r'}"></span>`;
+const money=v=>v==null?'–':(v<0?'−':'')+'$'+Math.abs(v).toFixed(2);
+const sgn=v=>v==null?'–':(v>=0?'+':'−')+'$'+Math.abs(v).toFixed(2);
+const dot=s=>`<span class="dot ${s}"></span>`;
+const okdot=ok=>dot(ok?'ok':'err');
 const tip=t=>`<span class="q" title="${t.replace(/"/g,'&quot;')}">?</span>`;
+const h3=(title,t,right='')=>`<h3><span class="t">${title}${t?' '+tip(t):''}</span>${right}</h3>`;
 const pct=v=>v==null?'–':(v*100).toFixed(1)+'%';
 const k1=v=>Math.round(v/1000).toLocaleString()+'k';
 const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const BANDS=[['<15','under 15'],['15-20','15-20'],['20-30','20-30'],['30+','30+']];
-let S,E,timer;
+let S,E;
 function store(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function recall(k,d){try{return localStorage.getItem(k)||d}catch(e){return d}}
-function show(id){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id=='t-'+id));store('tab',id)}
+function show(id){if(!document.getElementById('t-'+id))id='overview';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id=='t-'+id));store('tab',id)}
 
+/* ---------- charts ---------- */
 function chart(){const W=640,H=240,P={l:52,r:14,t:14,b:44},max=0.45;
  const x=k=>P.l+(k-0.6)/1.4*(W-P.l-P.r),y=v=>P.t+(1-Math.min(v,max)/max)*(H-P.t-P.b);
  const line=key=>S.breakeven.filter(b=>b[key]!=null).map((b,i)=>(i?'L':'M')+x(b.k).toFixed(1)+','+y(b[key]).toFixed(1)).join('');
- let g='';[0,.1,.2,.3,.4].forEach(v=>g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">$${v.toFixed(2)}</text>`);
+ let g='';[0,.1,.2,.3,.4].forEach(v=>g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(11,31,51,.12)"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">$${v.toFixed(2)}</text>`);
  S.breakeven.forEach(b=>g+=`<text x="${x(b.k)}" y="${H-P.b+18}" text-anchor="middle">${b.k.toFixed(1)}</text>`);
  g+=`<text x="${(P.l+W-P.r)/2}" y="${H-6}" text-anchor="middle">distance from SPY, in expected moves (k)</text>`;
- const pts=S.realCredits.slice(-10).map(r=>`<circle cx="${x(r.k)}" cy="${y(r.mid)}" r="6" fill="var(--green)" style="filter:drop-shadow(0 0 5px var(--green))"/><text x="${x(r.k)+11}" y="${y(r.mid)-9}" style="fill:var(--green)">${r.day.slice(5)} real ${money(r.mid)}</text>`).join('');
- return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Credit needed to break even by distance">${g}<path d="${line('base')}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><path d="${line('v2')}" fill="none" stroke="var(--violet)" stroke-width="2.5"/>${pts}</svg>`;}
-
-function calendar(){const slots=S.logger.schedule,stateTip={ok:'Passed the check',bad:'Ran but failed the check',missed:'Was scheduled but no file appeared',off:'Not scheduled',next:'Next scheduled run'};
- return `<div class="cal"><span></span>${slots.map(s=>`<span class="h">${s}</span>`).join('')}${Object.entries(S.calendar).map(([d,row])=>`<span class="d">${d}</span>${slots.map(s=>{const st=row[s];return `<div class="cell ${st}" title="${d} ${s}: ${stateTip[st]}">${{ok:'✓',bad:'✗',missed:'!',next:'next',off:''}[st]}</div>`}).join('')}`).join('')}</div>
- <div class="key" style="margin-top:8px"><span><i style="background:#14532d"></i>passed</span><span><i style="background:#3b1212"></i>failed / missed</span><span><i style="outline:1px dashed var(--amber)"></i>next</span><span><i style="background:var(--empty)"></i>not scheduled</span></div>`;}
-
-function shadow(){const sh=S.shadow;
- if(!sh)return `<div class="p span2"><h3>TODAY'S WOULD-BE TRADE · NO ORDER</h3><div class="sub">No 10:15 run logged yet.</div></div>`;
- const res=sh.resultCautious==null?'<span class="sub">waiting for the 3:30 run</span>':`<b class="${sh.resultCautious>=0?'g':'r'}">${sgn(sh.resultCautious)}</b> cautious · ${sgn(sh.resultBest)} best`;
- return `<div class="p span2"><h3>LATEST WOULD-BE TRADE · ${sh.day} · NO ORDER ${tip('What the rules would have done, priced with real logged quotes. Nothing is sent to Robinhood.')}</h3>
- <div class="row"><span>Rules used</span><span>${esc(sh.rules)}</span></div>
- ${sh.skipChecks.map(c=>`<div class="row"><span>${c.hit==null?'<span class="a">?</span>':c.hit?'<span class="r">✗</span>':'<span class="g">✓</span>'} ${c.rule}</span><span class="sub">${c.hit?'skip'+(c.note?': '+esc(c.note):''):esc(c.note)||'clear'}</span></div>`).join('')}
- ${sh.status=='skipped'?`<div class="row"><span>Rules say</span><span class="a">sit out today (${esc(sh.skipped.join(', '))})</span></div>`:`
- <div class="row"><span>10:15 sell ${sh.spread} ($${sh.width}, k ${sh.k.toFixed(1)}${sh.delta!=null?', delta '+sh.delta.toFixed(2):''})</span><span>credit ${money(sh.entry.mid)}</span></div>
- <div class="row"><span>3:30 buy back${sh.exit.spy?' (SPY '+sh.exit.spy+')':''}</span><span>cost ${money(sh.exit.value)}</span></div>
- <div class="row"><span><b>Result per contract</b> ${tip('Credit minus 3:30 value minus fees and slippage, x100. The cautious case is the one that counts.')}</span><span>${res}</span></div>`}</div>`;}
+ const pts=S.realCredits.slice(-10).map(r=>`<circle cx="${x(r.k)}" cy="${y(r.mid)}" r="5" fill="#0B1F33"><title>${r.day}: ${money(r.mid)}</title></circle>`).join('');
+ const last=S.realCredits[S.realCredits.length-1];
+ const lab=last?`<text x="${x(last.k)+10}" y="${y(last.mid)-8}" style="fill:#0B1F33">real credits, ${S.realCredits.length} day${S.realCredits.length==1?'':'s'}</text>`:'';
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Credit needed to break even by distance">${g}<path d="${line('base')}" fill="none" stroke="rgba(11,31,51,.45)" stroke-width="2" stroke-dasharray="5 4"/><path d="${line('v2')}" fill="none" stroke="#14B8A6" stroke-width="2.5"/>${pts}${lab}</svg>`;}
 
 function evChart(){const ev=S.evidence,W=600,H=200,P={l:52,r:12,t:12,b:30},max=0.3;
  const x=i=>P.l+(i+.5)*(W-P.l-P.r)/4,y=v=>P.t+(1-(Math.max(-max,Math.min(max,v))+max)/(2*max))*(H-P.t-P.b);
- let g='';[-.3,-.15,0,.15,.3].forEach(v=>g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v==0?'var(--muted)':'var(--grid)'}"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">${v>0?'+':''}${v.toFixed(2)}</text>`);
+ let g='';[-.3,-.15,0,.15,.3].forEach(v=>g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v==0?'rgba(11,31,51,.45)':'rgba(11,31,51,.12)'}"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">${v>0?'+':''}${v.toFixed(2)}</text>`);
  BANDS.forEach(([,l],i)=>g+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle">VIX ${l}</text>`);
- const pts=ev.points.map((p,j)=>{const i=BANDS.findIndex(b=>b[0]==p.band),c=p.margin>=0?'var(--green)':'var(--red)';
-  return `<circle cx="${x(i)}" cy="${y(p.margin)}" r="6" fill="${c}"><title>${p.day}: ${sgn(p.margin)}</title></circle>${ev.points.length<8?`<text x="${x(i)+10}" y="${y(p.margin)-8}" style="fill:${c}">${p.day} ${sgn(p.margin)}</text>`:''}`}).join('');
+ const pts=ev.points.map((p,j)=>{const i=BANDS.findIndex(b=>b[0]==p.band),c=p.margin>=0?'#14B8A6':'#0B1F33',off=(j%5-2)*6;
+  return `<circle cx="${x(i)+off}" cy="${y(p.margin)}" r="5" fill="${c}"><title>${p.day}: ${sgn(p.margin)}</title></circle>`}).join('');
  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Real credit minus needed credit per day">${g}<text x="${W-P.r}" y="${y(.3)-2}" text-anchor="end">above 0 = paid</text>${pts}</svg>`;}
-const board=(name,b)=>`<table><tr><th>Rule</th><th>days skipped</th><th>avg loss on those days</th><th>verdict</th></tr>${b.rules.map(([r,n,v])=>`<tr><td>${r}</td><td>${n}</td><td>${money(v)}</td><td class="${v>b.all?'g':'a'}">${v>b.all?'helped':'gave up good days'}</td></tr>`).join('')}<tr><td class="sub">All days (${name})</td><td></td><td class="sub">${money(b.all)}</td><td></td></tr></table>`;
+
+function profitChart(days){const W=560,H=230,P={l:52,r:12,t:24,b:44};
+ const done=days.map(d=>d.result);let run=0;const cum=days.map(d=>run+=d.result||0);
+ const hi=Math.max(15,...done.filter(v=>v!=null),...cum),lo=Math.min(0,...done.filter(v=>v!=null),...cum);
+ const span=hi-lo,step=span>150?50:span>60?20:span>30?10:5;
+ const y=v=>P.t+(hi-v)/(hi-lo)*(H-P.t-P.b),n=days.length,bw=Math.min(44,(W-P.l-P.r)/n*0.6),cx=i=>P.l+(i+.5)*(W-P.l-P.r)/n;
+ let g='';for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v==0?'rgba(11,31,51,.45)':'rgba(11,31,51,.12)'}"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">${v<0?'−':''}$${Math.abs(v)}</text>`;
+ const why={'no exit':'no exit','no entry':'no entry','no runs':'no runs','sat out':'sat out'};
+ days.forEach((d,i)=>{
+  if(d.state=='done'){const top=y(Math.max(d.result,0)),h=Math.max(2,Math.abs(y(d.result)-y(0)));
+   g+=`<rect x="${cx(i)-bw/2}" y="${top}" width="${bw}" height="${h}" rx="4" fill="${d.result>=0?'#14B8A6':'#0B1F33'}"><title>${d.day}: ${sgn(d.result)}</title></rect>`;
+   if(n<=10)g+=`<text x="${cx(i)}" y="${d.result>=0?top-6:top+h+14}" text-anchor="middle" style="fill:#0B1F33">${(d.result>=0?'+':'−')+Math.abs(d.result).toFixed(2)}</text>`;}
+  else g+=`<rect x="${cx(i)-bw/2}" y="${y(0)-2}" width="${bw}" height="4" rx="2" fill="rgba(11,31,51,.18)"><title>${d.day}: ${d.state}</title></rect>`;
+  g+=`<text x="${cx(i)}" y="${H-P.b+18}" text-anchor="middle">${d.day}</text>`;
+  if(d.state!='done')g+=`<text x="${cx(i)}" y="${H-P.b+32}" text-anchor="middle">${why[d.state]||''}</text>`;});
+ const pts=cum.map((v,i)=>cx(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
+ const lx=cx(n-1),ly=y(cum[n-1]);
+ g+=`<polyline points="${pts}" fill="none" stroke="#0B1F33" stroke-width="2"/><circle cx="${lx}" cy="${ly}" r="4" fill="#0B1F33"/><text x="${lx-8}" y="${ly-10}" text-anchor="end" style="fill:#0B1F33">total ${sgn(cum[n-1])}</text>`;
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Would-be profit per day with a running total line">${g}</svg>`;}
+
+function calendar(){const slots=S.logger.schedule,stateTip={ok:'Passed the check',bad:'Ran but failed the check',missed:'Was scheduled but no file appeared',off:'Not scheduled',next:'Next scheduled run'};
+ return `<div class="cal"><span></span>${slots.map(s=>`<span class="h">${s}</span>`).join('')}${Object.entries(S.calendar).map(([d,row])=>`<span class="d">${d}</span>${slots.map(s=>{const st=row[s];return `<div class="cell ${st}" title="${d} ${s}: ${stateTip[st]}">${{ok:'✓',bad:'✕',missed:'!',next:'next',off:''}[st]}</div>`}).join('')}`).join('')}</div>
+ <div class="key"><span><i style="background:#14B8A6"></i>passed</span><span><i style="background:#B42318"></i>failed / missed</span><span><i style="background:rgba(11,31,51,.3)"></i>next</span><span><i style="background:rgba(11,31,51,.08)"></i>not scheduled</span></div>`;}
+
+function shadow(){const sh=S.shadow;
+ if(!sh)return `<div class="p span2">${h3("Latest would-be trade")}<div class="sub">No 10:15 run logged yet.</div></div>`;
+ const res=sh.resultCautious==null?'<span class="s3">waiting for the 3:30 run</span>':`<b class="num">${sgn(sh.resultCautious)}</b> <span class="s3">cautious · ${sgn(sh.resultBest)} best</span>`;
+ return `<div class="p span2">${h3(`Latest would-be trade · ${sh.day}`,'What the rules would have done, priced with real logged quotes. Nothing is sent to Robinhood.','<span class="chip">no order</span>')}
+ <div class="row"><span>Rules used</span><span>${esc(sh.rules)}</span></div>
+ ${sh.skipChecks.map(c=>`<div class="row"><span>${c.hit==null?dot(''):c.hit?dot('human'):dot('ok')}${c.rule}</span><span class="s3">${c.hit?'skip'+(c.note?': '+esc(c.note):''):esc(c.note)||'clear'}</span></div>`).join('')}
+ ${sh.status=='skipped'?`<div class="row"><span>Rules say</span><span>sit out today (${esc(sh.skipped.join(', '))})</span></div>`:`
+ <div class="row"><span>10:15 sell ${sh.spread} ($${sh.width}, k ${sh.k.toFixed(1)}${sh.delta!=null?', delta '+sh.delta.toFixed(2):''})</span><span class="num">credit ${money(sh.entry.mid)}</span></div>
+ <div class="row"><span>3:30 buy back${sh.exit.spy?' (SPY '+sh.exit.spy+')':''}</span><span class="num">cost ${money(sh.exit.value)}</span></div>
+ <div class="row"><span>Result per contract ${tip('Credit minus 3:30 value minus fees and slippage, x100. The cautious case is the one that counts.')}</span><span>${res}</span></div>`}</div>`;}
+
+const board=(name,b)=>`<table><tr><th>Rule</th><th>days skipped</th><th>avg loss those days</th><th>verdict</th></tr>${b.rules.map(([r,n,v])=>`<tr><td>${r}</td><td>${n}</td><td>${money(v)}</td><td style="font-family:var(--font-sans)">${v>b.all?dot('ok')+'helped':dot('')+'gave up good days'}</td></tr>`).join('')}<tr><td class="s3">All days (${name})</td><td></td><td class="s3">${money(b.all)}</td><td></td></tr></table>`;
+
+/* ---------- PROFITABILITY ---------- */
+function profitTab(){const P=S.profit,B=P.backtest,g=P.gauge,days=P.days;
+ if(!days.length){document.getElementById('profit').innerHTML=`<div class="p span4">${h3('Profitability')}<div class="sub">No 10:15 run logged yet, so there is nothing to price.</div></div>`;return}
+ const few=P.finished<P.targetDays;
+ let gauge='<div class="sub">No logged credits yet.</div>';
+ if(g.days){const lo=Math.min(g.credit,g.need)-0.08,hi=Math.max(g.credit,g.need)+0.08,pos=v=>((v-lo)/(hi-lo)*100).toFixed(1)+'%';
+  gauge=`<div class="gauge"><div class="track"></div><div class="need" style="left:${pos(g.need)}"></div><div class="lab" style="left:${pos(g.need)};top:-2px">need ${money(g.need)}</div>
+  <div class="real" style="left:${pos(g.credit)}"></div><div class="lab" style="left:${pos(g.credit)};top:40px">real ${money(g.credit)}</div></div>
+  <div class="row"><span>Margin per share</span><span class="num">${(g.margin>=0?'+':'−')+'$'+Math.abs(g.margin).toFixed(3)}</span></div>
+  <div class="row"><span>Entry days with a credit</span><span class="num">${g.days} (${g.dates.join(', ')})</span></div>
+  <div class="row"><span>Need on all 2024 days (looser test)</span><span class="num">${money(B.needAll)}</span></div>
+  <div class="row"><span>Reading</span><span>${Math.abs(g.margin)<0.02?'about break-even':g.margin>0?'credits beat the need':'credits fall short'}</span></div>`;}
+ const shown=days.slice(-5);
+ document.getElementById('profit').innerHTML=`
+ ${few?`<div class="notice"><span class="chip human"><i></i>read first</span><div><b>${P.finished} finished day${P.finished==1?' is':'s are'} far too few to call this profitable.</b> ${P.risk?`A single full loss costs about $${Math.round(P.risk)} a contract${P.winsToRepay?`, roughly ${P.winsToRepay} average wins`:''}.`:''} These cards track the evidence as it builds up; the verdict waits for the target number of days.</div></div>`:''}
+ <div class="p">${h3('Would-be profit to date','Credit at 10:15 minus value at 3:30, fees and slippage, x100. Priced with real quotes; no orders placed.')}
+  <div class="big">${sgn(P.total)}</div><div class="sub">after cautious costs, per contract</div>
+  <div class="row"><span>Best-case costs</span><span class="num">${sgn(P.totalBest)}</span></div>
+  <div class="row"><span>Finished days</span><span class="num">${P.finished}</span></div>
+  <div class="foot">$${P.width} wide · k ${P.k.toFixed(1)} · ${esc(P.rules.toLowerCase())}</div></div>
+ <div class="p">${h3('Win rate','Days where the spread kept enough of the credit to make money after costs.')}
+  <div class="big">${P.wins} / ${P.finished}</div><div class="sub">days made money</div>
+  <div class="row"><span>2024 backtest</span><span class="num">${pct(B.winRate)}</span></div>
+  <div class="row"><span>Full-loss days, 2024</span><span class="num">${pct(B.fullLossRate)}</span></div>
+  <div class="foot">2024 had ${B.lossDaysPerYear} losing days and ${B.fullLossesPerYear} full losses in ${B.days} trading days.</div></div>
+ <div class="p">${h3('Average per trade','Real average so far, next to what these credits should earn on average once losing days are counted.')}
+  <div class="big">${sgn(P.avg)}</div><div class="sub">real, ${P.finished} day${P.finished==1?'':'s'}</div>
+  <div class="row"><span>Expected at these credits</span><span class="num">${P.expected==null?'–':'≈ '+sgn(P.expected)}</span></div>
+  <div class="row"><span>Worst day</span><span class="num">${sgn(P.worst)}</span></div>
+  <div class="foot">Expected = real credit minus the 2024 need for the same VIX level, x100. Losing days pull the real average toward it.</div></div>
+ <div class="p">${h3('Risk per trade','The most one contract can lose: the width minus the credit, plus costs.')}
+  <div class="big">${P.risk==null?'–':'$'+Math.round(P.risk)}</div><div class="sub">worst case, one contract</div>
+  <div class="row"><span>Wins to repay one full loss</span><span class="num">${P.winsToRepay==null?'–':'≈ '+P.winsToRepay}</span></div>
+  <div class="row"><span>Profit ÷ risk, per trade</span><span class="num">${P.profitOverRisk==null?'–':(P.profitOverRisk*100).toFixed(1)+'%'}</span></div>
+  <div class="foot">Plan v2 limits risk to 1–2% of the account per trade.</div></div>
+ <div class="p span2">${h3('Profit per day and running total','',`<span class="s3 mono">cautious costs</span>`)}${profitChart(days)}
+  <div class="foot">Grey stubs are days without both a 10:15 entry and a 3:30 exit, so no result can be priced. Losing days show as navy bars below $0.</div></div>
+ <div class="p span2">${h3('Do real credits beat break-even?','This decides profitability over time, more than any win streak.')}
+  <div class="sub">Average real 10:15 credit vs. what 2024 needed on days with the same VIX.</div>${gauge}</div>
+ <div class="section">Evidence so far</div>
+ <div class="p">${h3('Progress to a verdict','',`<span class="chip human"><i></i>your call</span>`)}
+  <div class="big">${P.finished} <span class="s3" style="font-size:16px">/ ${P.targetDays}</span></div>
+  <div class="meter"><i style="width:${Math.min(100,P.finished/P.targetDays*100)}%"></i></div>
+  <div class="foot">Finished days needed before calling it. ${P.targetDays} is a placeholder until you set the target in the decision inbox.</div></div>
+ <div class="p span2">${h3(`Last ${shown.length} trading days`)}
+  <div class="days" style="grid-template-columns:repeat(${shown.length},1fr)">${shown.map(d=>`<div class="day ${d.state=='done'?'done':''}"><span class="s3">${d.day}</span><span class="v">${d.state=='done'?(d.result>=0?'+':'−')+Math.abs(d.result).toFixed(2):'–'}</span><span>${d.state=='done'?esc(d.spread):d.state=='no exit'?'credit '+d.credit.toFixed(2)+', no 3:30':d.state=='no entry'?'no 10:15':d.state=='sat out'?'rules sat out':'no runs'}</span></div>`).join('')}</div>
+  <div class="foot">Teal = finished would-be trade. A day needs both runs to count.</div></div>
+ <div class="p">${h3('Which rules were used')}
+  <div style="font-size:20px;font-weight:600">${esc(P.rules)}</div><div class="sub">${P.rules=='Plan v2'?'trend and skip rules applied':'not plan v2 yet'}</div>
+  <div class="row"><span>Price history ends</span><span class="num">${P.historyEnd}</span></div>
+  <div class="foot">${P.rules=='Plan v2'?'History is up to date, so plan v2 is scored.':"Plan v2's trend and gap-down checks need up-to-date prices. Until then, results use the simpler rule."}</div></div>`;}
 
 function render(){
  const alerts=S.alerts,safetyBad=S.safety.filter(x=>!x.ok&&!x.label.includes('approve')).length;
- document.getElementById('clock').textContent=S.asOf+'  ·  MODE: READ-ONLY  ·  refreshes every minute';
- const tabs=[['overview','OVERVIEW',alerts.length],['evidence','EVIDENCE',0],['safety','SAFETY & COST',safetyBad],['explorer','EXPLORER',0]];
+ document.getElementById('clock').textContent=S.asOf+' · refreshes every minute';
+ const tabs=[['overview','Overview',alerts.length],['profit','Profitability',0],['evidence','Evidence',0],['safety','Safety & cost',safetyBad],['explorer','Explorer',0]];
  document.getElementById('nav').innerHTML=tabs.map(([id,l,n])=>`<button data-t="${id}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
  const T=S.tests,ok=T.failed==0&&!T.error,ud=S.logger.usableDays,tgt=S.evidence.targetDays,nx=S.logger.next;
 
  /* OVERVIEW */
  document.getElementById('overview').innerHTML=`
- <div class="p span4"><h3>ROLLOUT</h3><div class="stages">${S.stages.map(s=>`<div class="st ${s.state}" title="${esc(s.note)}">${s.n}. ${esc(s.name)}<br>${s.state.toUpperCase()}</div>`).join('')}</div></div>
- ${alerts.length?`<div class="span4">${alerts.map(a=>`<div class="alert ${a.level}">▲ ${esc(a.text)}</div>`).join('')}</div>`:''}
- <div class="p"><h3>ORDERS PLACED ${tip('Real orders sent to Robinhood by the bot, ever. Counted in every Claude run record for this project.')}</h3><div class="big ${S.audit.orderCalls?'r':'g'}">${S.audit.orderCalls}</div><div class="sub">order tools ${S.safety[1].ok?'blocked':'NOT blocked'}</div></div>
- <div class="p"><h3>NEXT RUN ${tip('Countdown to the next scheduled logger run. The Mac must be awake and the Claude app open, or the run is skipped.')}</h3><div class="big b" id="cd">${nx?'–':'none'}</div><div class="sub">${nx?esc(nx.when)+' · Mac must be awake':'nothing scheduled'}</div></div>
- <div class="p"><h3>TESTS ${tip('Automated checks of the code, re-run whenever the code changes. All must pass.')}</h3><div class="big ${ok?'g':'r'}">${T.error?'error':T.passed+'/'+(T.passed+T.failed)}</div><div class="sub">passing · branch ${esc(S.branch.name)}${S.branch.ahead?' · '+S.branch.ahead+' commits not in main':''}</div></div>
- <div class="p"><h3>USABLE LOGGED DAYS ${tip('Days with a good 10:15 run, so real credits can be compared with break-even.')}</h3><div class="big b">${ud}<span class="sub" style="font-size:14px"> / ${tgt}</span></div><div class="bar" style="margin-top:8px"><i style="width:${Math.min(100,ud/tgt*100)}%"></i></div></div>
+ <div class="p span4">${h3('Rollout')}<div class="stages">${S.stages.map(s=>`<div class="st ${s.state}" title="${esc(s.note)}"><b>${s.n}. ${esc(s.name)}</b><span class="mono" style="font-size:11px">${s.state}</span></div>`).join('')}</div></div>
+ ${alerts.length?`<div class="span4">${alerts.map(a=>`<div class="alert ${a.level}">${dot(a.level=='red'?'err':'human')}<span>${esc(a.text)}</span></div>`).join('')}</div>`:''}
+ <div class="p">${h3('Orders placed','Real orders sent to Robinhood by the bot, ever. Counted in every Claude run record for this project.')}<div class="big ${S.audit.orderCalls?'errtxt':''}">${S.audit.orderCalls}</div><div class="sub">${S.safety[1].ok?okdot(true)+'order tools blocked':'<span class="errtxt">order tools NOT blocked</span>'}</div></div>
+ <div class="p">${h3('Next run','Countdown to the next scheduled logger run. The Mac must be awake and the Claude app open, or the run is skipped.')}<div class="big" id="cd">${nx?'–':'none'}</div><div class="sub">${nx?esc(nx.when):'nothing scheduled'}</div><div class="foot">Mac must be awake</div></div>
+ <div class="p">${h3('Tests','Automated checks of the code, re-run whenever the code changes. All must pass.')}<div class="big ${ok?'':'errtxt'}">${T.error?'error':T.passed+'/'+(T.passed+T.failed)}</div><div class="sub">${okdot(ok)}passing</div><div class="foot">branch ${esc(S.branch.name)}${S.branch.ahead?' · '+S.branch.ahead+' commits not in main':''}</div></div>
+ <div class="p">${h3('Usable logged days','Days with a good 10:15 run, so real credits can be compared with break-even.')}<div class="big">${ud}<span class="s3" style="font-size:16px"> / ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ud/tgt*100)}%"></i></div></div>
  ${shadow()}
- <div class="p span2"><h3>LOGGER CALENDAR (ET) ${tip('Each cell is one run slot. Red means it failed or never ran; hover for details.')}</h3>${calendar()}
-  <div class="sub" style="margin-top:8px">Daily runs: ${esc(S.logger.daily)}</div></div>
- <div class="p span3"><h3>CREDIT NEEDED TO BREAK EVEN · $5 WIDE · 2024 · CAUTIOUS ${tip('How much a spread must collect, after costs, to make money on average in 2024 (all days). A real credit above a line pays, if it holds over many days. The Evidence tab compares against the need for the same VIX level, which is fairer.')}</h3>${chart()}
-  <div class="key"><span><i style="background:var(--violet)"></i>plan v2 rules</span><span><i style="background:var(--muted)"></i>sell every day</span><span><i style="background:var(--green);border-radius:50%"></i>real 10:15 credit (${S.realCredits.length} day${S.realCredits.length==1?'':'s'}, not yet evidence)</span></div></div>
- <div class="p"><h3>END OF DAY · ${S.eod.day}</h3>${S.eod.lines.map(l=>`<div class="row"><span>${esc(l)}</span></div>`).join('')||'<div class="sub">nothing logged yet</div>'}</div>
- <div class="p span2 inbox"><h3>DECISION INBOX · ${S.decisions.length} ${tip('Things only you can decide. The dashboard shows them; it never approves anything. Kept in dashboard/manual.json.')}</h3>${S.decisions.map(d=>`<div class="item">${d.urgent?'<span class="a">▲</span>':'<span class="sub">·</span>'} ${esc(d.title)}<div class="why">${esc(d.why)}</div></div>`).join('')}</div>
- <div class="p span2"><h3>EVENT LOG · LATEST CHANGES ${tip('The most recent saved changes (git commits) to the project.')}</h3><pre>${S.activity.map(a=>esc(a.when+'  '+a.what)).join('\n')}</pre></div>`;
+ <div class="p span2">${h3('Logger calendar (ET)','Each cell is one run slot. Red outline means it failed or never ran; hover for details.')}${calendar()}
+  <div class="foot">Daily runs: ${esc(S.logger.daily)}</div></div>
+ <div class="p span3">${h3('Credit needed to break even · $5 wide · 2024 · cautious','How much a spread must collect, after costs, to make money on average in 2024 (all days). A real credit above a line pays, if it holds over many days. The Evidence tab compares against the need for the same VIX level, which is fairer.')}${chart()}
+  <div class="key"><span><i style="background:#14B8A6"></i>plan v2 rules</span><span><i style="background:rgba(11,31,51,.45)"></i>sell every day (dashed)</span><span><i style="background:#0B1F33;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>real 10:15 credits, not yet evidence</span></div></div>
+ <div class="p">${h3(`End of day · ${S.eod.day}`)}${S.eod.lines.map(l=>`<div class="row"><span>${esc(l)}</span></div>`).join('')||'<div class="sub">nothing logged yet</div>'}</div>
+ <div class="p span2 inbox">${h3(`Decision inbox · ${S.decisions.length}`,'Things only you can decide. The dashboard shows them; it never approves anything. Kept in dashboard/manual.json.')}${S.decisions.map(d=>`<div class="item">${dot(d.urgent?'human':'')}${esc(d.title)}<div class="why">${esc(d.why)}</div></div>`).join('')}</div>
+ <div class="p span2">${h3('Latest changes','The most recent saved changes (git commits) to the project.')}<pre class="log">${S.activity.map(a=>esc(a.when+'  '+a.what)).join('\n')}</pre></div>`;
+
+ profitTab();
 
  /* EVIDENCE */
  const ev=S.evidence,sl=S.slippage,counts=BANDS.map(([b])=>ev.points.filter(p=>p.band==b).length);
  document.getElementById('evidence').innerHTML=`
- <div class="p span3"><h3>EVIDENCE TRACKER · REAL CREDIT MINUS NEEDED, PER DAY ${tip('One dot per logged day: the real 10:15 credit minus the 2024 break-even credit for the same setup at the same VIX level. Dots need to sit above zero in every band, over many days.')}</h3>${evChart()}
-  <div class="sub">${ev.points.length?'Setup: '+esc(ev.points[ev.points.length-1].vs)+'. Plan v2 rules are used once the price history is up to date.':'No logged days yet.'}</div></div>
- <div class="p"><h3>PROGRESS TO A VERDICT</h3><div class="big b">${ev.points.length} / ${tgt}</div><div class="sub">logged days (target is a placeholder for you to set)</div><div class="bar" style="margin:10px 0"><i style="width:${Math.min(100,ev.points.length/tgt*100)}%"></i></div>
-  ${BANDS.map(([,l],i)=>`<div class="row"><span>VIX ${l}</span><span class="${counts[i]?'':'sub'}">${counts[i]} day${counts[i]==1?'':'s'}</span></div>`).join('')}</div>
- <div class="p span2"><h3>SLIPPAGE CHECK · REAL BID/ASK GAPS ${tip('The gap between bid and ask on each leg. Filling a 2-leg spread costs about one leg-gap versus the midpoint. Compared with the slippage the cost rule assumes.')}</h3>
-  <table><tr><th></th><th>measured</th><th>best case assumed</th><th>cautious assumed</th></tr>
+ <div class="p span3">${h3('Evidence tracker · real credit minus needed, per day','One dot per logged day: the real 10:15 credit minus the 2024 break-even credit for the same setup at the same VIX level. Dots need to sit above zero in every band, over many days.')}${evChart()}
+  <div class="key"><span><i style="background:#14B8A6;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>paid</span><span><i style="background:#0B1F33;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>fell short</span></div>
+  <div class="foot">${ev.points.length?'Setup: '+esc(ev.points[ev.points.length-1].vs)+'. Plan v2 rules are used once the price history is up to date.':'No logged days yet.'}</div></div>
+ <div class="p">${h3('Progress to a verdict','',`<span class="chip human"><i></i>your call</span>`)}<div class="big">${ev.points.length} <span class="s3" style="font-size:16px">/ ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ev.points.length/tgt*100)}%"></i></div>
+  ${BANDS.map(([,l],i)=>`<div class="row"><span>VIX ${l}</span><span class="num ${counts[i]?'':'s3'}">${counts[i]} day${counts[i]==1?'':'s'}</span></div>`).join('')}<div class="foot">Target is a placeholder for you to set.</div></div>
+ <div class="p span2">${h3('Slippage check · real bid/ask gaps','The gap between bid and ask on each leg. Filling a 2-leg spread costs about one leg-gap versus the midpoint. Compared with the slippage the cost rule assumes.')}
+  <table><tr><th></th><th>measured</th><th>best case</th><th>cautious</th></tr>
   <tr><td>Gap per leg, 10:15 (${sl.legs1015} legs)</td><td>${money(sl.legGap1015)}</td><td>–</td><td>–</td></tr>
   <tr><td>Gap per leg, 3:30 (${sl.legs1530} legs)</td><td>${money(sl.legGap1530)}</td><td>–</td><td>–</td></tr>
   <tr><td>Slippage in, per share</td><td>~${money(sl.legGap1015)}</td><td>${money(sl.bestIn)}</td><td>${money(sl.assumedIn)}</td></tr>
   <tr><td>Slippage out, per share</td><td>~${money(sl.legGap1530)}</td><td>${money(sl.bestOut)}</td><td>${money(sl.assumedOut)}</td></tr></table>
-  <div class="sub" style="margin-top:8px">Gaps widen on volatile days; keep the cautious case until many days are logged.</div></div>
- <div class="p span2"><h3>UPCOMING SKIP DAYS ${tip('Fed, CPI and jobs-report days in the next 60 days, from the events file. Plan v2 sits these out.')}</h3>${S.upcoming.map(u=>`<div class="row"><span>${u.day}</span><span class="a">${u.what} · bot sits out</span></div>`).join('')||'<div class="sub">none in the next 60 days</div>'}<div class="sub" style="margin-top:8px">${esc(S.upcomingNote)}</div></div>
- <div class="p span2"><h3>SKIP-RULE SCOREBOARD · 2024 ${tip('For sell-every-day, $5 wide, k 1.0: the average loss on the days each rule would skip. If it is higher than the all-days average, skipping helped. Small samples: a guide, not proof.')}</h3>${board('2024',S.skipBoard.validation)}</div>
- <div class="p span2"><h3>SKIP-RULE SCOREBOARD · 2022-23</h3>${board('2022-23',S.skipBoard.train)}<div class="sub" style="margin-top:8px">Rules that "gave up good days" in both periods are candidates to drop, with your approval.</div></div>`;
+  <div class="foot">Gaps widen on volatile days; keep the cautious case until many days are logged.</div></div>
+ <div class="p span2">${h3('Upcoming skip days','Fed, CPI and jobs-report days in the next 60 days, from the events file. Plan v2 sits these out.')}${S.upcoming.map(u=>`<div class="row"><span class="num">${u.day}</span><span>${u.what} · bot sits out</span></div>`).join('')||'<div class="sub">none in the next 60 days</div>'}<div class="foot">${esc(S.upcomingNote)}</div></div>
+ <div class="p span2">${h3('Skip-rule scoreboard · 2024','For sell-every-day, $5 wide, k 1.0: the average loss on the days each rule would skip. If it is higher than the all-days average, skipping helped. Small samples: a guide, not proof.')}${board('2024',S.skipBoard.validation)}</div>
+ <div class="p span2">${h3('Skip-rule scoreboard · 2022-23')}${board('2022-23',S.skipBoard.train)}<div class="foot">Rules that "gave up good days" in both periods are candidates to drop, with your approval.</div></div>`;
 
  /* SAFETY & COST */
  const au=S.audit,co=S.costs,fr=S.freshness;
- const costBars=co.runs.length?co.runs.map(r=>`<div style="margin:10px 0"><div class="row" style="border:0;padding:0 0 4px"><span>${r.label}</span><span>${k1(r.output)} out · ${k1(r.write)} new context · ${k1(r.reread)} re-read</span></div><div class="bar"><i style="width:${Math.min(100,r.output/40000*100)}%;background:${r.output>20000?'var(--amber)':'var(--green)'}"></i></div></div>`).join(''):'<div class="sub">No logger runs found in the run records yet.</div>';
+ const costBars=co.runs.length?co.runs.slice(-8).map(r=>`<div><div class="row" style="border:0;padding:0 0 4px"><span class="num">${r.label}</span><span class="num s3">${k1(r.output)} out · ${k1(r.write)} new · ${k1(r.reread)} re-read</span></div><div class="meter"><i style="width:${Math.min(100,r.output/40000*100)}%;background:${r.output>20000?'#0B1F33':'#14B8A6'}"></i></div></div>`).join(''):'<div class="sub">No logger runs found in the run records yet.</div>';
  document.getElementById('safety').innerHTML=`
- <div class="p span2"><h3>ORDER-TOOL AUDIT ${tip('Searches every Claude run record in this project for any order-tool call. Orders placed must always be 0.')}</h3>
-  <div class="stat"><div>orders placed<b class="${au.orderCalls?'r':'g'}">${au.orderCalls}</b></div><div>order previews<b class="${au.previewCalls?'a':'g'}">${au.previewCalls}</b></div><div>tool calls scanned<b>${au.toolCalls.toLocaleString()}</b></div></div>
-  <div class="row" style="margin-top:10px"><span>${light(true)}Run records scanned</span><span>${au.transcripts}</span></div>
-  <div class="row"><span>${light(au.guardTest=='pass')}Guard tests (no order code, tools blocked)</span><span class="${au.guardTest=='pass'?'g':'r'}">${au.guardTest}</span></div>
-  <div class="row"><span>${light(au.denyRulesCoverPreview)}Settings block the preview tools</span><span class="${au.denyRulesCoverPreview?'g':'r'}">${au.denyRulesCoverPreview?'yes':'no'}</span></div>
-  ${au.previewCalls?`<div class="sub" style="margin-top:8px">First preview: ${au.previewWhen}. A preview asks Robinhood to check an order; it never places one${au.denyRulesCoverPreview?', and previews are now blocked':''}.</div>`:''}</div>
- <div class="p span2"><h3>SAFETY</h3>${S.safety.map(x=>`<div class="row"><span>${x.label.includes('approve')?'<span class="dot a"></span>':light(x.ok)}${x.label}</span><span class="${x.ok?'g':x.label.includes('approve')?'a':'r'}">${esc(x.value)}</span></div><div class="sub" style="margin:-2px 0 6px 17px;font-size:11px">${esc(x.detail)}</div>`).join('')}</div>
- <div class="p span2"><h3>COST METER · TOKENS PER LOGGER RUN ${tip('Tokens are what each Claude run uses. Output = text Claude writes; re-read = earlier conversation read again each step. Budget target is about '+k1(co.budgetPerDay)+' per trading day.')}</h3>${costBars}
-  <div class="sub">Bar turns amber above 20k output tokens.</div></div>
- <div class="p"><h3>DATA FRESHNESS ${tip('The price test needs SPY and VIX history up to the last trading day. When it falls behind, plan v2 rules cannot be checked for the latest days.')}</h3><div class="big ${fr.behindDays?'a':'g'}">${fr.behindDays?fr.behindDays+' day'+(fr.behindDays>1?'s':''):'current'}</div><div class="sub">${fr.behindDays?'behind · ':''}last ${fr.last}</div>${fr.missing.length?`<div class="row" style="margin-top:8px"><span>Missing</span><span>${fr.missing.join(', ')}</span></div>`:''}</div>
- <div class="p"><h3>LOGGER RUNS</h3>${S.logger.runs.slice(-8).map(r=>`<div class="row" title="${esc(r.problems.join('; '))}"><span>${light(r.result=='ok')}${r.day.slice(5)} ${r.time}</span><span>${r.contracts??'failed'}</span></div>`).join('')||'<div class="sub">none yet</div>'}<div class="sub" style="margin-top:6px">contracts per run</div></div>`;
+ <div class="p span2">${h3('Order-tool audit','Searches every Claude run record in this project for any order-tool call. Orders placed must always be 0.')}
+  <div class="stat"><div>orders placed<b class="${au.orderCalls?'errtxt':''}">${au.orderCalls}</b></div><div>order previews<b>${au.previewCalls}</b></div><div>tool calls scanned<b>${au.toolCalls.toLocaleString()}</b></div></div>
+  <div class="row"><span>${okdot(true)}Run records scanned</span><span class="num">${au.transcripts}</span></div>
+  <div class="row"><span>${okdot(au.guardTest=='pass')}Guard tests (no order code, tools blocked)</span><span class="num">${au.guardTest}</span></div>
+  <div class="row"><span>${okdot(au.denyRulesCoverPreview)}Settings block the preview tools</span><span>${au.denyRulesCoverPreview?'yes':'<span class="errtxt">no</span>'}</span></div>
+  ${au.previewCalls?`<div class="foot">First preview: ${au.previewWhen}. A preview asks Robinhood to check an order; it never places one${au.denyRulesCoverPreview?', and previews are now blocked':''}.</div>`:''}</div>
+ <div class="p span2">${h3('Safety')}${S.safety.map(x=>`<div class="row"><span>${x.label.includes('approve')?dot(''):okdot(x.ok)}${x.label}<div class="s3" style="font-size:12px;margin-left:16px">${esc(x.detail)}</div></span><span class="num ${!x.ok&&!x.label.includes('approve')?'errtxt':''}">${esc(x.value)}</span></div>`).join('')}</div>
+ <div class="p span2">${h3('Tokens per logger run','Tokens are what each Claude run uses. Output = text Claude writes; re-read = earlier conversation read again each step. Budget target is about '+k1(co.budgetPerDay)+' per trading day.')}${costBars}
+  <div class="foot">Bar turns navy above 20k output tokens.</div></div>
+ <div class="p">${h3('Data freshness','The price test needs SPY and VIX history up to the last trading day. When it falls behind, plan v2 rules cannot be checked for the latest days.')}<div class="big">${fr.behindDays?fr.behindDays+' day'+(fr.behindDays>1?'s':''):'current'}</div><div class="sub">${fr.behindDays?'behind · ':''}last ${fr.last}</div>${fr.missing.length?`<div class="row"><span>Missing</span><span class="num">${fr.missing.length>3?fr.missing.length+' days':fr.missing.join(', ')}</span></div>`:''}</div>
+ <div class="p">${h3('Logger runs')}${S.logger.runs.slice(-8).map(r=>`<div class="row" title="${esc(r.problems.join('; '))}"><span class="num">${okdot(r.result=='ok')}${r.day.slice(5)} ${r.time}</span><span class="num ${r.contracts==null?'errtxt':''}">${r.contracts??'failed'}</span></div>`).join('')||'<div class="sub">none yet</div>'}<div class="foot">contracts per run</div></div>`;
 
  /* EXPLORER */
  const keep=['xv','xw','xk'].map(id=>document.getElementById(id)?.value);
  document.getElementById('explorer').innerHTML=`
- <div class="p span4"><h3>SETUP EXPLORER ${tip('Pick a setup to see how it did in the price test and what real quotes looked like. Put side shown for real quotes.')}</h3>
+ <div class="p span4">${h3('Setup explorer','Pick a setup to see how it did in the price test and what real quotes looked like. Put side shown for real quotes.')}
   <div class="ctl"><label>Rules <select id="xv"><option value="v2">plan v2</option><option value="put_skips">put only + skips</option><option value="baseline">sell put every day</option></select></label>
   <label>Width <select id="xw"><option>2</option><option selected>5</option><option>10</option></select></label>
   <label>Distance k <select id="xk">${[...Array(16)].map((_,i)=>{const k=(0.5+i*.1).toFixed(1);return `<option ${k=='1.0'?'selected':''}>${k}</option>`}).join('')}</select></label></div>
@@ -169,20 +295,20 @@ function render(){
  tick();
 }
 
-function explore(){const v=xv.value,w=xw.value,k=(+xk.value).toFixed(1).replace(/\.0$/,'.0'),r=E.rows[`${v}|${w}|${k}`]||{},q=E.real[`${w}|${k}`];
- const col=(p,lab)=>{const d=r[p];if(!d)return `<div class="p"><h3>${lab}</h3><div class="sub">no data</div></div>`;return `<div class="p"><h3>${lab}</h3>
- <div class="row"><span>Needed, cautious</span><b>${money(d.be)}</b></div><div class="row"><span>Needed, best case</span><span>${money(d.best)}</span></div>
- <div class="row"><span>Days traded / skipped</span><span>${d.n} / ${d.skip}</span></div><div class="row"><span>Loss days</span><span>${pct(d.loss)}</span></div>
- <div class="row"><span>Full-loss days</span><span>${pct(d.full)}</span></div><div class="row"><span>Worst losing streak</span><span>${d.streak}</span></div></div>`};
+function explore(){const v=xv.value,w=xw.value,k=(+xk.value).toFixed(1),r=E.rows[`${v}|${w}|${k}`]||{},q=E.real[`${w}|${k}`];
+ const col=(p,lab)=>{const d=r[p];if(!d)return `<div class="p">${h3(lab)}<div class="sub">no data</div></div>`;return `<div class="p">${h3(lab)}
+ <div class="row"><span>Needed, cautious</span><b class="num">${money(d.be)}</b></div><div class="row"><span>Needed, best case</span><span class="num">${money(d.best)}</span></div>
+ <div class="row"><span>Days traded / skipped</span><span class="num">${d.n} / ${d.skip}</span></div><div class="row"><span>Loss days</span><span class="num">${pct(d.loss)}</span></div>
+ <div class="row"><span>Full-loss days</span><span class="num">${pct(d.full)}</span></div><div class="row"><span>Worst losing streak</span><span class="num">${d.streak}</span></div></div>`};
  let real='<div class="sub">No 10:15 run logged yet.</div>';
  if(q){const paid=q.mid!=null&&r.validation&&q.mid>=r.validation.be;
-  real=`<div class="row"><span>Expected move to 3:30</span><span>$${E.move}</span></div><div class="row"><span>Put spread</span><span>${q.short} / ${q.long}</span></div>
-  ${q.mid==null?`<div class="row"><span>Real credit</span><span class="a">not logged (strike not listed)</span></div>`:`
-  <div class="row"><span>Real midpoint credit</span><b>${money(q.mid)}</b></div><div class="row"><span>Short leg delta</span><span>${q.delta??'–'}</span></div>
-  <div class="row"><span>vs 2024 cautious need (all days)</span><span class="${paid?'g':'r'}">${paid?'above':'below'} by ${money(Math.abs(q.mid-(r.validation?r.validation.be:0)))}</span></div>`}`;}
- xout.innerHTML=`<div class="grid" style="padding:0">${col('train','2022-23 (TRAINING)')}${col('validation','2024 (VALIDATION)')}
- <div class="p span2"><h3>REAL QUOTE${E.day?` · ${E.day} 10:15 · SPY ${E.spy} · VIX ${E.vix}`:''}</h3>${real}
- <div class="sub" style="margin-top:8px">Plan v2 may pick a call spread on down-trend days; call quotes are logged too.</div></div></div>`;}
+  real=`<div class="row"><span>Expected move to 3:30</span><span class="num">$${E.move}</span></div><div class="row"><span>Put spread</span><span class="num">${q.short} / ${q.long}</span></div>
+  ${q.mid==null?`<div class="row"><span>Real credit</span><span>not logged (strike not listed)</span></div>`:`
+  <div class="row"><span>Real midpoint credit</span><b class="num">${money(q.mid)}</b></div><div class="row"><span>Short leg delta</span><span class="num">${q.delta??'–'}</span></div>
+  <div class="row"><span>vs 2024 cautious need (all days)</span><span>${dot(paid?'ok':'')}${paid?'above':'below'} by <span class="num">${money(Math.abs(q.mid-(r.validation?r.validation.be:0)))}</span></span></div>`}`;}
+ xout.innerHTML=`<div class="xgrid">${col('train','2022-23 (training)')}${col('validation','2024 (validation)')}
+ <div class="p span2">${h3('Real quote'+(E.day?` · ${E.day} 10:15 · SPY ${E.spy} · VIX ${E.vix}`:''))}${real}
+ <div class="foot">Plan v2 may pick a call spread on down-trend days; call quotes are logged too.</div></div></div>`;}
 
 function tick(){const el=document.getElementById('cd');if(!el||!S.nextRunISO)return;const ms=new Date(S.nextRunISO)-new Date();if(ms<=0){el.textContent='due';return}const h=Math.floor(ms/36e5),m=Math.floor(ms%36e5/6e4);el.textContent=`${h}h ${String(m).padStart(2,'0')}m`;}
 

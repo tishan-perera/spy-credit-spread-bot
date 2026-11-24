@@ -140,7 +140,7 @@ def test_collect_on_real_project_is_json_and_has_every_panel(tmp_path):
     json.dumps(s)
     for key in ("asOf", "stages", "safety", "tests", "branch", "logger", "breakeven", "realCredits",
                 "decisions", "activity", "alerts", "calendar", "costs", "freshness", "audit", "shadow",
-                "evidence", "slippage", "skipBoard", "upcoming", "eod", "explorer"):
+                "evidence", "slippage", "skipBoard", "upcoming", "eod", "explorer", "profit"):
         assert key in s, key
     assert s["shadow"]["resultCautious"] == pytest.approx(17.34)
     assert len(s["explorer"]["rows"]) == 144
@@ -174,3 +174,62 @@ def test_as_of_date_hides_later_logged_days(tmp_path):
         return s["shadow"]["day"]
     assert shadow_day(18) == dashboard._short(date(2026, 11, 18))
     assert shadow_day(19) == dashboard._short(date(2026, 11, 19))
+
+
+# --- profitability -----------------------------------------------------------------
+
+def _pday(day, state, credit=None, value=None, need=0.282):
+    res = dashboard.result_per_contract(credit, value, "cautious") if state == "done" else None
+    best = dashboard.result_per_contract(credit, value, "best") if state == "done" else None
+    return {"day": day, "state": state, "credit": credit, "value": value, "need": need, "result": res, "best": best}
+
+
+def test_profit_summary_totals_wins_and_expectation():
+    days = [_pday("Nov 18", "done", 0.25, 0.0), _pday("Nov 19", "no exit", 0.32),
+            _pday("Nov 20", "no runs"), _pday("Nov 24", "done", 0.29, 0.01)]
+    s = dashboard.profit_summary(days, width=5)
+    assert (s["finished"], s["wins"], s["losses"]) == (2, 2, 0)
+    assert s["total"] == pytest.approx(37.68) and s["totalBest"] == pytest.approx(48.68)
+    assert s["avg"] == pytest.approx(18.84)
+    assert s["expected"] == pytest.approx(-1.2, abs=0.01)        # credit minus the VIX-band need, x100
+    assert s["risk"] == pytest.approx(480.66, abs=0.01)          # width minus credit, plus cautious costs
+    assert s["winsToRepay"] == 26
+    assert s["worst"] == pytest.approx(17.34)
+
+
+def test_profit_gauge_uses_every_day_with_a_credit():
+    days = [_pday("Nov 18", "done", 0.25, 0.0), _pday("Nov 19", "no exit", 0.32), _pday("Nov 24", "done", 0.29, 0.01)]
+    g = dashboard.profit_summary(days, width=5)["gauge"]
+    assert g["days"] == 3
+    assert g["credit"] == pytest.approx(0.2867, abs=1e-4) and g["need"] == pytest.approx(0.282)
+    assert g["margin"] == pytest.approx(0.0047, abs=1e-4)
+
+
+def test_profit_summary_counts_a_losing_day():
+    s = dashboard.profit_summary([_pday("a", "done", 0.25, 0.0), _pday("b", "done", 0.25, 1.25)], width=5)
+    assert (s["wins"], s["losses"]) == (1, 1)
+    assert s["worst"] == pytest.approx(-107.66)
+
+
+def test_profit_summary_with_no_finished_days():
+    s = dashboard.profit_summary([_pday("a", "no runs")], width=5)
+    assert s["finished"] == 0 and s["total"] == 0 and s["avg"] is None and s["gauge"]["days"] == 0
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "snapshots" / "2026-11-24" / "1530.json").exists(), reason="no Nov 24 log")
+def test_profit_days_on_real_logs():
+    pt = dashboard.price_test(ROOT)
+    days = dashboard.profit_days(ROOT, pt, {"shadow": {"width": 5, "k": 1.0}}, date(2026, 11, 24))
+    got = {d["day"]: (d["state"], d["result"]) for d in days}
+    assert got["Nov 18"] == ("done", pytest.approx(17.34))
+    assert got["Nov 19"][0] == "no exit" and got["Nov 20"][0] == "no runs" and got["Nov 23"][0] == "no entry"
+    assert got["Nov 24"] == ("done", pytest.approx(20.34))
+    assert days[-1]["day"] == "Nov 24"
+
+
+def test_static_file_serves_bundled_fonts_only():
+    body, kind = dashboard.static_file(ROOT, "/static/fonts/Inter-Regular.ttf")
+    assert kind == "font/ttf" and len(body) > 1000
+    assert dashboard.static_file(ROOT, "/static/../../spybot/config.py") is None
+    assert dashboard.static_file(ROOT, "/static/fonts/missing.ttf") is None
+    assert dashboard.static_file(ROOT, "/static/%2e%2e/manual.json") is None

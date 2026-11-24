@@ -15,6 +15,7 @@ import time as _time
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
 from spybot import calendar, compare, config, ingest, pricetest, report
@@ -364,6 +365,91 @@ def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None
     }
 
 
+# --- profitability (would-be trades priced with real logged quotes; no orders) ------------
+
+def profit_days(root: Path, pt: dict, manual: dict, today: date, n: int = 10) -> list[dict]:
+    """One entry per trading day from the first 10:15 log to today (last n days).
+
+    state: done (entry and exit priced) | no exit | no entry | no runs | sat out (rules skipped the day)
+    """
+    root = Path(root)
+    width, k = manual.get("shadow", {}).get("width", 5), manual.get("shadow", {}).get("k", 1.0)
+    snap_root = root / "data" / "snapshots"
+    firsts = [date.fromisoformat(p.name) for p in snap_root.glob("*") if (p / "1015.json").exists()]
+    if not firsts:
+        return []
+    val = pt["sweeps"]["validation"]
+    out = []
+    for d in calendar.trading_days(min(firsts), today)[-n:]:
+        folder = snap_root / d.isoformat()
+        rows, fresh = _real_rows(root, d, pt)
+        setup = Setup(width, k, "v2" if fresh else "baseline")
+        r = rows.get(setup)
+        e = {"day": _short(d), "date": d.isoformat(), "state": "no runs", "credit": None, "value": None,
+             "need": None, "result": None, "best": None, "spread": None, "band": None,
+             "rules": "plan v2" if fresh else "sell every day", "skipped": []}
+        if r is None or r.status in ("no 10:15 run", "not logged"):
+            if folder.exists() and any(folder.glob("*.json")):
+                e["state"] = "no entry"
+            out.append(e)
+            continue
+        e.update(spread=f"{r.side.title()} {r.short}/{r.long}", band=r.vix_band,
+                 need=_r(val[setup].by_band.get(r.vix_band, (0, None))[1]))
+        if r.status == "skipped":
+            e.update(state="sat out", skipped=list(r.skipped))
+        else:
+            value = r.value_1530 if r.value_1530 is not None else r.value_1540
+            e.update(credit=_r(r.mid_credit, 2), value=_r(value, 2))
+            if value is None:
+                e["state"] = "no exit"
+            else:
+                e.update(state="done", result=result_per_contract(r.mid_credit, value, "cautious"),
+                         best=result_per_contract(r.mid_credit, value, "best"))
+        out.append(e)
+    return out
+
+
+def profit_summary(days: list[dict], width: int) -> dict:
+    done = [d for d in days if d["state"] == "done"]
+    results = [d["result"] for d in done]
+    wins = [x for x in results if x > 0]
+    with_need = [d for d in done if d["need"] is not None]
+    cost = pricetest.cost_per_share("cautious")
+    risk = (sum((width - d["credit"] + cost) * 100 for d in done) / len(done)) if done else None
+    avg = sum(results) / len(results) if results else None
+    credited = [d for d in days if d["state"] in ("done", "no exit") and d["credit"] is not None and d["need"] is not None]
+    g_credit = sum(d["credit"] for d in credited) / len(credited) if credited else None
+    g_need = sum(d["need"] for d in credited) / len(credited) if credited else None
+    return {
+        "finished": len(done), "wins": len(wins), "losses": len(results) - len(wins),
+        "total": round(sum(results), 2), "totalBest": round(sum(d["best"] for d in done), 2),
+        "avg": _r(avg, 2), "worst": _r(min(results), 2) if results else None,
+        "expected": _r(sum((d["credit"] - d["need"]) * 100 for d in with_need) / len(with_need), 2) if with_need else None,
+        "risk": _r(risk, 2),
+        "winsToRepay": round(risk / (sum(wins) / len(wins))) if wins and risk else None,
+        "profitOverRisk": _r(avg / risk, 4) if avg is not None and risk else None,
+        "gauge": {"days": len(credited), "credit": _r(g_credit, 4), "need": _r(g_need, 4),
+                  "margin": _r(g_credit - g_need, 4) if credited else None,
+                  "dates": [d["day"] for d in credited]},
+    }
+
+
+def profitability(root: Path, pt: dict, manual: dict, today: date) -> dict:
+    width, k = manual.get("shadow", {}).get("width", 5), manual.get("shadow", {}).get("k", 1.0)
+    days = profit_days(root, pt, manual, today)
+    fresh = bool(days) and all(d["rules"] == "plan v2" for d in days if d["state"] != "no runs")
+    variant = "v2" if fresh else "baseline"
+    s = pt["sweeps"]["validation"][Setup(width, k, variant)]
+    return {**profit_summary(days, width), "days": days, "width": width, "k": k,
+            "rules": "Plan v2" if fresh else "Sell every day",
+            "historyEnd": _short(max(pt["spy"])), "targetDays": manual.get("evidenceTargetDays", 60),
+            "backtest": {"winRate": _r(1 - s.loss_rate, 3) if s.loss_rate is not None else None,
+                         "fullLossRate": _r(s.full_loss_rate, 3), "days": s.n_traded,
+                         "lossDaysPerYear": round(s.loss_rate * s.n_traded) if s.loss_rate is not None else None,
+                         "fullLossesPerYear": round(s.full_loss_rate * s.n_traded) if s.full_loss_rate is not None else None,
+                         "needAll": _r(s.breakeven.get("cautious"))}}
+
+
 # --- git and tests ---------------------------------------------------------------------
 
 def _git(root: Path, *args: str) -> str:
@@ -477,6 +563,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         "upcoming": up, "upcomingNote": up_note,
         "eod": {"day": _short(date.fromisoformat(latest)) if latest else "–", "lines": eod_lines},
         "explorer": tp["explorer"],
+        "profit": profitability(root, pt, manual, today),
     }
 
 
@@ -508,6 +595,19 @@ class _Cache:
             return self.status
 
 
+STATIC_TYPES = {".ttf": "font/ttf", ".txt": "text/plain; charset=utf-8", ".css": "text/css", ".svg": "image/svg+xml"}
+
+
+def static_file(root: Path, url_path: str) -> tuple[bytes, str] | None:
+    """A file under dashboard/static, or None. Never serves anything outside that folder."""
+    base = (Path(root) / "dashboard" / "static").resolve()
+    rel = unquote(url_path.split("?")[0])[len("/static/"):]
+    target = (base / rel).resolve()
+    if base not in target.parents or not target.is_file() or target.suffix not in STATIC_TYPES:
+        return None
+    return target.read_bytes(), STATIC_TYPES[target.suffix]
+
+
 def serve(root: Path, port: int = 8790) -> None:
     root = Path(root)
     page = root / "dashboard" / "index.html"
@@ -522,6 +622,8 @@ def serve(root: Path, port: int = 8790) -> None:
                     body, kind = json.dumps(cache.get()).encode(), "application/json"
                 except Exception as e:      # show the problem on the page instead of a blank screen
                     body, kind = json.dumps({"error": f"{type(e).__name__}: {e}"}).encode(), "application/json"
+            elif self.path.startswith("/static/") and (found := static_file(root, self.path)):
+                body, kind = found
             else:
                 self.send_error(404)
                 return
