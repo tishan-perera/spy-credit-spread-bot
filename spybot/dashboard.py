@@ -544,6 +544,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         eod_lines.append(f"Watch: price history {fresh['behindDays']} day(s) behind.")
 
     costs = [r for r in audit["loggerRuns"]]
+    profit = profitability(root, pt, manual, today)
     return {
         "asOf": f"{now:%a} {_short(today)}, {now.year} · {_clock(f'{now:%H%M}')} ET",
         "stages": manual.get("stages", []),
@@ -576,7 +577,8 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         "upcoming": up, "upcomingNote": up_note,
         "eod": {"day": _short(date.fromisoformat(latest)) if latest else "–", "lines": eod_lines},
         "explorer": tp["explorer"],
-        "profit": profitability(root, pt, manual, today),
+        "profit": profit,
+        "verdictDays": profit["finished"],     # the one progress count shown on every tab
     }
 
 

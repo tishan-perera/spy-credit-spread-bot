@@ -209,7 +209,7 @@ function profitTab(){const P=S.profit,B=P.backtest,g=P.gauge,days=P.days;
   <div class="sub">Average real 10:15 credit vs. what 2024 needed on days with the same VIX.</div>${gauge}</div>
  <div class="section">Evidence so far</div>
  <div class="p">${h3('Progress to a verdict','',`<span class="chip human"><i></i>your call</span>`)}
-  <div class="big">${P.finished} <span class="s3" style="font-size:16px">/ ${P.targetDays}</span></div>
+  <div class="big">${S.verdictDays} <span class="s3" style="font-size:16px">/ ${P.targetDays}</span></div>
   <div class="meter"><i style="width:${Math.min(100,P.finished/P.targetDays*100)}%"></i></div>
   <div class="foot">Finished days needed before calling it. ${P.targetDays} is a placeholder until you set the target in the decision inbox.</div></div>
  <div class="p span2">${h3(`Last ${shown.length} trading days`)}
@@ -226,7 +226,7 @@ function render(){
  const tabs=[['overview','Overview',alerts.length],['profit','Profitability',0],['evidence','Evidence',0],['safety','Safety & cost',safetyBad],['explorer','Explorer',0]];
  document.getElementById('nav').innerHTML=tabs.map(([id,l,n])=>`<button data-t="${id}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
- const T=S.tests,ok=T.failed==0&&!T.error,ud=S.logger.usableDays,tgt=S.evidence.targetDays,nx=S.logger.next;
+ const T=S.tests,ok=T.failed==0&&!T.error,ud=S.verdictDays,tgt=S.evidence.targetDays,nx=S.logger.next;
 
  /* OVERVIEW */
  document.getElementById('overview').innerHTML=`
@@ -235,7 +235,7 @@ function render(){
  <div class="p">${h3('Orders placed','Real orders sent to Robinhood by the bot, ever. Counted in every Claude run record for this project.')}<div class="big ${S.audit.orderCalls?'errtxt':''}">${S.audit.orderCalls}</div><div class="sub">${S.safety[1].ok?okdot(true)+'order tools blocked':'<span class="errtxt">order tools NOT blocked</span>'}</div></div>
  <div class="p">${h3('Next run','Countdown to the next scheduled logger run. The Mac must be awake and the Claude app open, or the run is skipped.')}<div class="big" id="cd">${nx?'–':'none'}</div><div class="sub">${nx?esc(nx.when):'nothing scheduled'}</div><div class="foot">Mac must be awake</div></div>
  <div class="p">${h3('Tests','Automated checks of the code, re-run whenever the code changes. All must pass.')}<div class="big ${ok?'':'errtxt'}">${T.error?'error':T.passed+'/'+(T.passed+T.failed)}</div><div class="sub">${okdot(ok)}passing</div><div class="foot">branch ${esc(S.branch.name)}${S.branch.ahead?' · '+S.branch.ahead+' commits not in main':''}</div></div>
- <div class="p">${h3('Usable logged days','Days with a good 10:15 run, so real credits can be compared with break-even.')}<div class="big">${ud}<span class="s3" style="font-size:16px"> / ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ud/tgt*100)}%"></i></div></div>
+ <div class="p">${h3('Days toward a verdict','Finished would-be trades: a real 10:15 entry and a 3:30 exit, both priced from logged quotes. The same count is used on every tab.')}<div class="big">${ud}<span class="s3" style="font-size:16px"> / ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ud/tgt*100)}%"></i></div></div>
  ${shadow()}
  <div class="p span2">${h3('Logger calendar (ET)','Each cell is one run slot. Red outline means it failed or never ran; hover for details.')}${calendar()}
   <div class="foot">Daily runs: ${esc(S.logger.daily)}. On early-close days the 3:30 and 3:40 columns show the 12:30 and 12:40 runs.</div></div>
@@ -248,13 +248,13 @@ function render(){
  profitTab();
 
  /* EVIDENCE */
- const ev=S.evidence,sl=S.slippage,counts=BANDS.map(([b])=>ev.points.filter(p=>p.band==b).length);
+ const ev=S.evidence,sl=S.slippage,counts=BANDS.map(([b])=>S.profit.days.filter(d=>d.state=='done'&&d.band==b).length);
  document.getElementById('evidence').innerHTML=`
  <div class="p span3">${h3('Evidence tracker · real credit minus needed, per day','One dot per logged day: the real 10:15 credit minus the 2024 break-even credit for the same setup at the same VIX level. Dots need to sit above zero in every band, over many days.')}${evChart()}
   <div class="key"><span><i style="background:#14B8A6;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>paid</span><span><i style="background:#0B1F33;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>fell short</span></div>
   <div class="foot">${ev.points.length?'Setup: '+esc(ev.points[ev.points.length-1].vs)+'. Plan v2 rules are used once the price history is up to date.':'No logged days yet.'}</div></div>
- <div class="p">${h3('Progress to a verdict','',`<span class="chip human"><i></i>your call</span>`)}<div class="big">${ev.points.length} <span class="s3" style="font-size:16px">/ ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ev.points.length/tgt*100)}%"></i></div>
-  ${BANDS.map(([,l],i)=>`<div class="row"><span>VIX ${l}</span><span class="num ${counts[i]?'':'s3'}">${counts[i]} day${counts[i]==1?'':'s'}</span></div>`).join('')}<div class="foot">Target is a placeholder for you to set.</div></div>
+ <div class="p">${h3('Progress to a verdict','',`<span class="chip human"><i></i>your call</span>`)}<div class="big">${S.verdictDays} <span class="s3" style="font-size:16px">/ ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,S.verdictDays/tgt*100)}%"></i></div>
+  ${BANDS.map(([,l],i)=>`<div class="row"><span>VIX ${l}</span><span class="num ${counts[i]?'':'s3'}">${counts[i]} day${counts[i]==1?'':'s'}</span></div>`).join('')}<div class="foot">Finished days, split by VIX. ${ev.points.length} day${ev.points.length==1?' has':'s have'} a logged credit (dots on the left), including any without a 3:30 exit. Target is a placeholder for you to set.</div></div>
  <div class="p span2">${h3('Slippage check · real bid/ask gaps','The gap between bid and ask on each leg. Filling a 2-leg spread costs about one leg-gap versus the midpoint. Compared with the slippage the cost rule assumes.')}
   <table><tr><th></th><th>measured</th><th>best case</th><th>cautious</th></tr>
   <tr><td>Gap per leg, 10:15 (${sl.legs1015} legs)</td><td>${money(sl.legGap1015)}</td><td>–</td><td>–</td></tr>
