@@ -96,7 +96,10 @@ def calendar_grid(root: Path, now: datetime) -> dict:
         row = {}
         for i, slot in enumerate(SLOTS):
             if i >= len(runs):
-                row[_slot(slot)] = "off"
+                # not planned (before the daily schedule began), but show a run that did happen
+                times = calendar.log_runs(day)
+                state = health.slot_state(root, day, times[i], now) if i < len(times) else "off"
+                row[_slot(slot)] = state if state in ("ok", "bad", "error") else "off"
                 continue
             state = health.slot_state(root, day, runs[i], now)
             if state == "upcoming":

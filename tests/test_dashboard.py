@@ -269,3 +269,11 @@ def test_cost_per_day_totals():
     runs = [{"day": "2026-11-25", "output": 1, "write": 2, "reread": 3},
             {"day": "2026-11-25", "output": 10, "write": 20, "reread": 30}]
     assert dashboard.cost_per_day(runs) == [{"day": "2026-11-25", "runs": 2, "output": 11, "write": 22, "reread": 33}]
+
+
+def test_calendar_shows_runs_that_happened_before_the_daily_schedule(tmp_path):
+    # Nov 23 is before config.LOGGER_START, so nothing was planned, but two runs did happen and passed.
+    _snap(tmp_path, "2026-11-23", "1530")
+    _snap(tmp_path, "2026-11-23", "1540")
+    grid = dashboard.calendar_grid(tmp_path, datetime(2026, 11, 25, 15, 0, tzinfo=ET))
+    assert grid["Nov 23"] == {"10:00": "off", "10:15": "off", "10:30": "off", "3:30": "ok", "3:40": "ok"}
