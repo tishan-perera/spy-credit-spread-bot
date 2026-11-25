@@ -62,7 +62,8 @@ svg text{font:11px var(--font-mono);fill:var(--text-3)}
 .cal .h{font:11px var(--font-mono);color:var(--text-3);text-align:center}.cal .d{font:12px var(--font-mono);color:var(--text-2)}
 .cell{height:28px;border-radius:6px;background:var(--navy-soft);display:grid;place-items:center;font:500 12px var(--font-mono);color:var(--text-3);cursor:default}
 .cell.ok{background:var(--teal-soft);box-shadow:inset 0 0 0 1px var(--teal-line);color:var(--navy)}
-.cell.bad,.cell.missed{background:var(--surface);box-shadow:inset 0 0 0 1px rgba(180,35,24,.45);color:var(--err)}
+.cell.bad,.cell.missed,.cell.error{background:var(--surface);box-shadow:inset 0 0 0 1px rgba(180,35,24,.45);color:var(--err)}
+.cell.planned{background:var(--surface);box-shadow:inset 0 0 0 1px var(--border)}
 .cell.next{background:var(--surface);box-shadow:inset 0 0 0 1px var(--navy-mid);color:var(--navy);border:1px dashed var(--navy-mid)}
 .meter{height:8px;background:var(--navy-soft);border-radius:4px;overflow:hidden}.meter i{display:block;height:100%;background:var(--teal)}
 .inbox .item{padding:10px 0;border-top:1px solid var(--border)}.inbox .why{color:var(--text-2);font-size:13px;margin:2px 0 0 16px}
@@ -150,8 +151,8 @@ function profitChart(days){const W=560,H=230,P={l:52,r:12,t:24,b:44};
  g+=`<polyline points="${pts}" fill="none" stroke="#0B1F33" stroke-width="2"/><circle cx="${lx}" cy="${ly}" r="4" fill="#0B1F33"/><text x="${lx-8}" y="${ly-10}" text-anchor="end" style="fill:#0B1F33">total ${sgn(cum[n-1])}</text>`;
  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Would-be profit per day with a running total line">${g}</svg>`;}
 
-function calendar(){const slots=S.logger.schedule,stateTip={ok:'Passed the check',bad:'Ran but failed the check',missed:'Was scheduled but no file appeared',off:'Not scheduled',next:'Next scheduled run'};
- return `<div class="cal"><span></span>${slots.map(s=>`<span class="h">${s}</span>`).join('')}${Object.entries(S.calendar).map(([d,row])=>`<span class="d">${d}</span>${slots.map(s=>{const st=row[s];return `<div class="cell ${st}" title="${d} ${s}: ${stateTip[st]}">${{ok:'✓',bad:'✕',missed:'!',next:'next',off:''}[st]}</div>`}).join('')}`).join('')}</div>
+function calendar(){const slots=S.logger.schedule,stateTip={ok:'Passed the check',bad:'Ran but failed the check',error:'Stopped with an error before the check',missed:'Was scheduled but no file appeared',off:'Not scheduled',next:'Next scheduled run',planned:'Scheduled'};
+ return `<div class="cal"><span></span>${slots.map(s=>`<span class="h">${s}</span>`).join('')}${Object.entries(S.calendar).map(([d,row])=>`<span class="d">${d}</span>${slots.map(s=>{const st=row[s];return `<div class="cell ${st}" title="${d} ${s}: ${stateTip[st]}">${{ok:'✓',bad:'✕',error:'✕',missed:'!',next:'next',planned:'',off:''}[st]}</div>`}).join('')}`).join('')}</div>
  <div class="key"><span><i style="background:#14B8A6"></i>passed</span><span><i style="background:#B42318"></i>failed / missed</span><span><i style="background:rgba(11,31,51,.3)"></i>next</span><span><i style="background:rgba(11,31,51,.08)"></i>not scheduled</span></div>`;}
 
 function shadow(){const sh=S.shadow;
@@ -237,7 +238,7 @@ function render(){
  <div class="p">${h3('Usable logged days','Days with a good 10:15 run, so real credits can be compared with break-even.')}<div class="big">${ud}<span class="s3" style="font-size:16px"> / ${tgt}</span></div><div class="meter"><i style="width:${Math.min(100,ud/tgt*100)}%"></i></div></div>
  ${shadow()}
  <div class="p span2">${h3('Logger calendar (ET)','Each cell is one run slot. Red outline means it failed or never ran; hover for details.')}${calendar()}
-  <div class="foot">Daily runs: ${esc(S.logger.daily)}</div></div>
+  <div class="foot">Daily runs: ${esc(S.logger.daily)}. On early-close days the 3:30 and 3:40 columns show the 12:30 and 12:40 runs.</div></div>
  <div class="p span3">${h3('Credit needed to break even · $5 wide · 2024 · cautious','How much a spread must collect, after costs, to make money on average in 2024 (all days). A real credit above a line pays, if it holds over many days. The Evidence tab compares against the need for the same VIX level, which is fairer.')}${chart()}
   <div class="key"><span><i style="background:#14B8A6"></i>plan v2 rules</span><span><i style="background:rgba(11,31,51,.45)"></i>sell every day (dashed)</span><span><i style="background:#0B1F33;width:8px;height:8px;border-radius:50%;vertical-align:0"></i>real 10:15 credits, not yet evidence</span></div></div>
  <div class="p">${h3(`End of day · ${S.eod.day}`)}${S.eod.lines.map(l=>`<div class="row"><span>${esc(l)}</span></div>`).join('')||'<div class="sub">nothing logged yet</div>'}</div>

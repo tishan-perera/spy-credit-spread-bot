@@ -332,3 +332,32 @@ def test_dropped_contracts_are_saved_with_the_snapshot(tmp_path):
     saved = json.loads((tmp_path / "data" / "snapshots" / DAY.isoformat() / "1507.json").read_text())
     assert len(saved["dropped"]) == 1 and saved["dropped"][0].startswith("put:703")
     assert ingest.load_snapshot(tmp_path, DAY, "1507").dropped == tuple(saved["dropped"])
+
+
+# --- a day's entry and exit snapshots (exit is 12:30/12:40 on early-close days) ---
+
+def _save_snap(root, day, hhmm):
+    raw = load("good_1507.json")
+    folder = root / "data" / "snapshots" / day.isoformat()
+    folder.mkdir(parents=True, exist_ok=True)
+    snap, _ = ingest.parse(raw)
+    (folder / f"{hhmm}.json").write_text(json.dumps(ingest._to_json(snap)))
+
+
+def test_load_day_uses_1530_on_a_normal_day(tmp_path):
+    day = date(2026, 11, 25)
+    for h in ("1015", "1530", "1230"):
+        _save_snap(tmp_path, day, h)
+    snaps = ingest.load_day(tmp_path, day)
+    assert set(snaps) == {"1015", "exit", "exit_fallback"}
+    assert snaps["1015"] is not None and snaps["exit"] is not None and snaps["exit_fallback"] is None
+
+
+def test_load_day_uses_1230_on_an_early_close_day(tmp_path):
+    day = date(2026, 11, 27)
+    _save_snap(tmp_path, day, "1015")
+    _save_snap(tmp_path, day, "1530")                # should be ignored on a 1 PM close
+    assert ingest.load_day(tmp_path, day)["exit"] is None
+    _save_snap(tmp_path, day, "1240")
+    snaps = ingest.load_day(tmp_path, day)
+    assert snaps["exit"] is None and snaps["exit_fallback"] is not None

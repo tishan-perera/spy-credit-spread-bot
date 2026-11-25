@@ -111,3 +111,47 @@ def cboe_mismatches(vix: dict[date, DayBar], cboe: dict[date, tuple[float, float
             if abs(vix[day].open - o) > CBOE_TOLERANCE or abs(vix[day].close - c) > CBOE_TOLERANCE:
                 bad.append(day)
     return bad
+
+
+# --- daily refresh -------------------------------------------------------------------
+
+KINDS = {"spy_day": ("SPY", "day"), "vix_day": ("VIX", "day"), "spy_5min": ("SPY", "5minute")}
+
+
+def _range(name: str) -> tuple[str, str]:
+    """('2026-11-02', '2026-11-24') from 'spy_day_2026-11-02_2026-11-24.json'."""
+    parts = Path(name).stem.split("_")
+    return parts[-2], parts[-1]
+
+
+def by_age(paths) -> list[Path]:
+    """History files in load order: the one reaching the latest day last, so the newest download wins."""
+    return sorted((Path(p) for p in paths), key=lambda p: (_range(p.name)[1], _range(p.name)[0]))
+
+
+def save_history(root: Path, kind: str, source: Path) -> Path:
+    """Save one downloaded Robinhood answer (plain JSON or text blocks) as data/history/KIND_FIRST_LAST.json,
+    after checking it holds the right symbol and interval. Older refresh files of the same kind that the
+    new file fully covers are removed."""
+    from spybot.ingest import _load_tool_result
+    symbol, interval = KINDS[kind]
+    data = _load_tool_result(source)
+    results = data["data"]["results"]
+    if not results or results[0].get("symbol") != symbol:
+        raise ValueError(f"{source}: expected {symbol} bars, got {results[0].get('symbol') if results else 'none'}")
+    if results[0].get("interval") != interval:
+        raise ValueError(f"{source}: expected {interval} bars, got {results[0].get('interval')}")
+    days = sorted(_utc(b["begins_at"]).astimezone(ET).date() if interval != "day" else date.fromisoformat(b["begins_at"][:10])
+                  for r in results for b in r["bars"])
+    if not days:
+        raise ValueError(f"{source}: no bars")
+    first, last = days[0].isoformat(), days[-1].isoformat()
+    folder = Path(root) / "data" / "history"
+    folder.mkdir(parents=True, exist_ok=True)
+    out = folder / f"{kind}_{first}_{last}.json"
+    out.write_text(json.dumps(data))
+    for old in folder.glob(f"{kind}_*.json"):
+        a, b = _range(old.name)
+        if old != out and a >= first and b <= last:
+            old.unlink()
+    return out

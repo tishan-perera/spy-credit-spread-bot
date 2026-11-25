@@ -11,6 +11,7 @@ The bot's "agents" are Claude Code sessions. This page lists everything outside 
 | superpowers plugin | Working method used to build the project: brainstorm → design → plan → test-first build → review | Claude plugin marketplace |
 | Project rules | `CLAUDE.md` (published) and `CLAUDE.local.md` (private, git-ignored) | This repo |
 | Project permissions | `.claude/settings.json`: blocks every order tool | This repo |
+| Background watcher | Every 15 minutes: Mac notification for any new missed/failed logger run, stale history or a calendar running out; backup of `data/raw`, `data/snapshots`, `data/history`, `data/cboe` to iCloud Drive (`SPY-bot-backup`; files are only added or updated) | `sh ops/watch-service.sh install` (also `status`, `uninstall`); log in `~/Library/Logs/spybot-watch.log`. `.venv/bin/python -m spybot health` prints the same check |
 | Dashboard service | Read-only status page at http://127.0.0.1:8790, run by macOS as a background service so it survives idle chats and Claude app updates | `sh ops/dashboard-service.sh install` (also `status`, `uninstall`); log in `~/Library/Logs/spybot-dashboard.log` |
 | Scheduled logger runs | One-time or daily Claude tasks that follow `collector/logger-task.md` | Claude app → Scheduled; prompts kept in [scheduled-tasks/](scheduled-tasks/) |
 

@@ -13,7 +13,7 @@ from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from spybot import config
+from spybot import calendar, config
 
 LABEL_TOLERANCE_MIN = 5          # a run more than 5 minutes from its label is not that run
 ET = ZoneInfo(config.MARKET_TZ)
@@ -194,6 +194,14 @@ def load_snapshot(root: Path, day: date, hhmm: str) -> Snapshot | None:
     if not path.exists():
         return None
     return _from_json(json.loads(path.read_text()))
+
+
+def load_day(root: Path, day: date) -> dict[str, Snapshot | None]:
+    """The day's 10:15 entry snapshot and its exit snapshots ("exit", "exit_fallback"):
+    3:30/3:40 normally, 12:30/12:40 on 1 PM early-close days."""
+    exit_run, fallback = calendar.exit_runs(day)
+    return {"1015": load_snapshot(root, day, "1015"), "exit": load_snapshot(root, day, exit_run),
+            "exit_fallback": load_snapshot(root, day, fallback)}
 
 
 def _load_tool_result(path: Path):

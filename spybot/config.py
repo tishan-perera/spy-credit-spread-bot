@@ -43,6 +43,7 @@ PERIODS = {
 HISTORY_START = date(2022, 1, 3)
 
 # Logger checks
+LOGGER_START = date(2026, 11, 24)   # first full day of the five scheduled daily runs (they began 11-23 afternoon)
 STALE_QUOTE_SEC = 60
 STALE_DROP_MAX_SHARE = 0.05   # up to 5% of contracts may be dropped as stale; more rejects the run
 

@@ -23,7 +23,6 @@ VARIANT_LABELS = {
     "v2": "Plan v2 rules (trend + skips)",
 }
 TABLE_KS = tuple(round(0.6 + 0.2 * i, 1) for i in range(8))   # 0.6, 0.8, ... 2.0
-LOG_RUNS = ("1015", "1530", "1540")
 
 
 def _money(x: float | None) -> str:
@@ -36,9 +35,9 @@ def _pct(x: float | None) -> str:
 
 def _load(root: Path):
     hist = Path(root) / "data" / "history"
-    spy, p1 = history.load_daily(sorted(hist.glob("spy_day_*.json")))
-    vix, p2 = history.load_daily(sorted(hist.glob("vix_day_*.json")))
-    intraday, p3 = history.load_intraday(sorted(hist.glob("spy_5min_*.json")))
+    spy, p1 = history.load_daily(history.by_age(hist.glob("spy_day_*.json")))
+    vix, p2 = history.load_daily(history.by_age(hist.glob("vix_day_*.json")))
+    intraday, p3 = history.load_intraday(history.by_age(hist.glob("spy_5min_*.json")))
     bad = json.loads((calendar.REFERENCE / "bad_bars.json").read_text())
     p4 = []
     for symbol, bars in (("SPY", spy), ("VIX", vix)):
@@ -84,7 +83,7 @@ def _logged_rows(root: Path, spy, events, today: date):
         folder = logged.get(day)
         if folder is not None:
             n_bad += len(list(folder.glob("*.bad.json")))
-        snaps = {run: ingest.load_snapshot(root, day, run) for run in LOG_RUNS}
+        snaps = ingest.load_day(root, day)
         before = [d for d in sorted(spy) if d < day][-config.TREND_LOOKBACK:]
         if len(before) < config.TREND_LOOKBACK or before[-1] != calendar.previous_trading_day(day):
             stale.append(day)

@@ -8,7 +8,7 @@ What is **not** in this repo (on purpose) and how it comes back:
 |---|---|---|
 | `CLAUDE.local.md`, `.private-patterns` | Private (account digits) | Step 4, from the example file |
 | `data/history/`, `data/cboe/` | Market data, large, re-downloadable | Step 6 |
-| `data/raw/`, `data/snapshots/` (logged quotes) | Collected live each day | Lost with the computer; logging restarts at step 8. Back these folders up separately if they matter |
+| `data/raw/`, `data/snapshots/` (logged quotes) | Collected live each day | Backed up every 15 minutes to iCloud Drive → `SPY-bot-backup` by the background watcher. On a new computer, copy `raw`, `snapshots`, `history` and `cboe` from there into `data/` before step 6 |
 | Scheduled tasks | Live in the Claude app | Step 8, from `ops/scheduled-tasks/` |
 | Robinhood connector login | A login, never written down | Step 3 **(you)** |
 
@@ -84,7 +84,13 @@ What the files should look like, and which problems are expected, is in [docs/hi
 ```bash
 .venv/bin/python -m spybot dashboard
 ```
-This shows the project's status page at http://127.0.0.1:8790.
+This shows the project's status page at http://127.0.0.1:8790. To keep it running in the background: `sh ops/dashboard-service.sh install`.
+
+## 10. Alerts and backup
+```bash
+sh ops/watch-service.sh install
+```
+Every 15 minutes this checks for missed or failed logger runs (Mac notification) and backs up `data/` to iCloud Drive. Also re-create the daily history refresh task ([ops/scheduled-tasks/history-refresh.md](ops/scheduled-tasks/history-refresh.md)) and the one-time 12:30/12:40 tasks for the coming early-close days.
 
 ## Final checklist
 - [ ] All tests pass, including `test_no_orders` and `test_public_safety`
@@ -93,3 +99,5 @@ This shows the project's status page at http://127.0.0.1:8790.
 - [ ] `check-history` shows only the expected problems; `report` runs
 - [ ] One test logger run ended with `ok`
 - [ ] Daily runs created after the owner's approval
+- [ ] History refresh task and early-close tasks created; `python -m spybot health` prints `all good`
+- [ ] Background watcher installed (`sh ops/watch-service.sh status`)

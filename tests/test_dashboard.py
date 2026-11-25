@@ -33,26 +33,6 @@ def test_logger_runs_reads_good_and_bad_snapshots(tmp_path):
     assert runs[0]["time"] == "10:15 AM"
 
 
-def test_calendar_marks_ok_bad_missed_next_and_off():
-    runs = [{"day": "2026-11-17", "hhmm": "1015", "result": "ok"},
-            {"day": "2026-11-17", "hhmm": "1530", "result": "bad"}]
-    scheduled = [{"day": "2026-11-17", "hhmm": "1000"},     # passed, no file → missed
-                 {"day": "2026-11-18", "hhmm": "1015"}]     # still ahead → next
-    now = datetime(2026, 11, 18, 9, 0, tzinfo=ET)
-    grid = dashboard.calendar_grid(runs, scheduled, now)
-    assert grid["Nov 17"] == {"10:00": "missed", "10:15": "ok", "10:30": "off", "3:30": "bad", "3:40": "off"}
-    assert grid["Nov 18"]["10:15"] == "next"
-    assert list(grid)[-1] == "Nov 19"                    # always shows the next trading day
-
-
-def test_next_run_is_first_scheduled_time_after_now():
-    sched = [{"when": "2026-11-18T10:10:00-05:00", "what": "a"}, {"when": "2026-11-19T10:10:00-05:00", "what": "b"}]
-    nxt = dashboard.next_run(sched, datetime(2026, 11, 18, 12, 0, tzinfo=ET))
-    assert nxt["what"] == "b" and nxt["iso"] == "2026-11-19T10:10:00-05:00"
-    assert nxt["when"] == "Thu Nov 19 · 10:10 AM ET"
-    assert dashboard.next_run(sched, datetime(2026, 11, 20, tzinfo=ET)) is None
-
-
 # --- transcripts: order audit and logger cost ---------------------------------
 
 def _line(**kw):
@@ -142,7 +122,9 @@ def test_collect_on_real_project_is_json_and_has_every_panel(tmp_path):
                 "decisions", "activity", "alerts", "calendar", "costs", "freshness", "audit", "shadow",
                 "evidence", "slippage", "skipBoard", "upcoming", "eod", "explorer", "profit"):
         assert key in s, key
-    assert s["shadow"]["resultCautious"] == pytest.approx(17.34)
+    # 9.34: with history through Nov 17 (refreshed 2026-11-25) Nov 18 is judged by plan v2 (call 742/747);
+    # before the refresh it fell back to sell-every-day (17.34)
+    assert s["shadow"]["resultCautious"] == pytest.approx(9.34)
     assert len(s["explorer"]["rows"]) == 144
 
 
@@ -221,9 +203,9 @@ def test_profit_days_on_real_logs():
     pt = dashboard.price_test(ROOT)
     days = dashboard.profit_days(ROOT, pt, {"shadow": {"width": 5, "k": 1.0}}, date(2026, 11, 24))
     got = {d["day"]: (d["state"], d["result"]) for d in days}
-    assert got["Nov 18"] == ("done", pytest.approx(17.34))
+    assert got["Nov 18"] == ("done", pytest.approx(9.34))          # plan v2 since the history refresh
     assert got["Nov 19"][0] == "no exit" and got["Nov 20"][0] == "no runs" and got["Nov 23"][0] == "no entry"
-    assert got["Nov 24"] == ("done", pytest.approx(20.34))
+    assert got["Nov 24"] == ("done", pytest.approx(9.34))          # plan v2 (call 730/735) since the refresh
     assert days[-1]["day"] == "Nov 24"
 
 
@@ -233,3 +215,57 @@ def test_static_file_serves_bundled_fonts_only():
     assert dashboard.static_file(ROOT, "/static/../../spybot/config.py") is None
     assert dashboard.static_file(ROOT, "/static/fonts/missing.ttf") is None
     assert dashboard.static_file(ROOT, "/static/%2e%2e/manual.json") is None
+
+
+# --- workflow health on the dashboard (planned runs come from the calendar) ---
+
+def test_usable_days_match_the_report(tmp_path):
+    from spybot import report
+    today = date(2026, 11, 25)
+    pt = dashboard.price_test(ROOT)
+    tp = dashboard.trading_panels(ROOT, pt, dashboard.load_manual(ROOT), today)
+    spy = report._load(ROOT)[0]
+    _, used, _, _, _ = report._logged_rows(ROOT, spy, pt["events"], today)
+    assert tp["usableDays"] == len(used)
+
+
+def test_calendar_comes_from_the_market_calendar(tmp_path):
+    for h in ("1000", "1015", "1030", "1530", "1540"):
+        _snap(tmp_path, "2026-11-24", h)
+    _snap(tmp_path, "2026-11-25", "1000")
+    _snap(tmp_path, "2026-11-25", "1015", bad=["x"])
+    raw = tmp_path / "data" / "raw" / "2026-11-25"
+    raw.mkdir(parents=True)
+    (raw / "1030.error.txt").write_text("tool failed")
+    now = datetime(2026, 11, 25, 15, 0, tzinfo=ET)
+    grid = dashboard.calendar_grid(tmp_path, now)
+    assert grid["Nov 25"] == {"10:00": "ok", "10:15": "bad", "10:30": "error", "3:30": "next", "3:40": "planned"}
+    assert grid["Nov 24"]["3:40"] == "ok"
+    assert list(grid)[-1] == "Nov 27"                      # next trading day, skipping Thanksgiving
+    assert grid["Nov 27"]["3:30"] == "planned"             # its exit runs are 12:30/12:40, shown in the exit columns
+
+
+def test_dashboard_alerts_and_next_run_come_from_health(tmp_path):
+    s = dashboard.collect(tmp_path, datetime(2026, 11, 25, 16, 30, tzinfo=ET), tests={"passed": 1, "failed": 0},
+                          transcripts=tmp_path, pt=dashboard.price_test(ROOT))
+    texts = [a["text"] for a in s["alerts"]]
+    assert "Logger run Wed Nov 25 10:00 AM never ran." in texts
+    assert s["nextRunISO"] == "2026-11-27T10:00:00-05:00"
+    assert "trading day" in s["logger"]["daily"]
+
+
+def test_daily_task_run_is_labelled_from_task_name_and_start_time(tmp_path):
+    (tmp_path / "run.jsonl").write_text("\n".join([
+        _line(type="queue-operation", timestamp="2026-11-25T15:22:31.000Z"),
+        _line(type="user", message={"content": '<scheduled-task name="spy-logger-1030" file="x"> '
+                                               "follow collector/logger-task.md, with DAY = today's date"}),
+        _assistant("m1", [("Bash", {"command": "cat > notes"})], out=4),
+    ]))
+    runs = dashboard.scan_transcripts(tmp_path)["loggerRuns"]
+    assert [(r["day"], r["hhmm"], r["output"]) for r in runs] == [("2026-11-25", "1030", 4)]
+
+
+def test_cost_per_day_totals():
+    runs = [{"day": "2026-11-25", "output": 1, "write": 2, "reread": 3},
+            {"day": "2026-11-25", "output": 10, "write": 20, "reread": 30}]
+    assert dashboard.cost_per_day(runs) == [{"day": "2026-11-25", "runs": 2, "output": 11, "write": 22, "reread": 33}]

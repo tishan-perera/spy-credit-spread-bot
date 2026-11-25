@@ -56,3 +56,79 @@ def test_cboe_mismatches_are_found():
     assert cboe[date(2022, 1, 3)] == (17.6, 16.6)
     # 2022-01-06 close differs (19.61 vs 22.00); 2022-01-07 is not in the Cboe sample, so not judged
     assert history.cboe_mismatches(vix, cboe) == [date(2022, 1, 6)]
+
+
+# --- daily refresh: save a downloaded answer under data/history and keep the newest ---
+import json
+
+
+def _answer(symbol, interval, days, value=1.0, index=False):
+    bars = []
+    for d in days:
+        b = {"begins_at": f"{d}T00:00:00Z" if interval == "day" else f"{d}T14:30:00Z"}
+        keys = ("open_value", "high_value", "low_value", "close_value") if index else \
+               ("open_price", "high_price", "low_price", "close_price")
+        b.update({k: str(value) for k in keys})
+        bars.append(b)
+    return {"data": {"results": [{"symbol": symbol, "interval": interval, "bars": bars}]}}
+
+
+def test_save_history_names_file_by_its_range(tmp_path):
+    src = tmp_path / "answer.txt"
+    src.write_text(json.dumps([{"type": "text", "text": json.dumps(
+        _answer("SPY", "day", ["2026-11-17", "2026-11-18", "2026-11-24"]))}]))
+    out = history.save_history(tmp_path, "spy_day", src)
+    assert out == tmp_path / "data" / "history" / "spy_day_2026-11-17_2026-11-24.json"
+    assert json.loads(out.read_text())["data"]["results"][0]["symbol"] == "SPY"
+
+
+def test_save_history_rejects_the_wrong_kind(tmp_path):
+    src = tmp_path / "a.json"
+    src.write_text(json.dumps(_answer("QQQ", "day", ["2026-11-17"])))
+    try:
+        history.save_history(tmp_path, "spy_day", src)
+    except ValueError as e:
+        assert "SPY" in str(e)
+    else:
+        raise AssertionError("accepted the wrong symbol")
+    src.write_text(json.dumps(_answer("SPY", "5minute", ["2026-11-17"])))
+    try:
+        history.save_history(tmp_path, "spy_day", src)
+    except ValueError as e:
+        assert "day" in str(e)
+    else:
+        raise AssertionError("accepted the wrong interval")
+
+
+def test_save_history_removes_older_refresh_files_it_fully_covers(tmp_path):
+    hist = tmp_path / "data" / "history"
+    hist.mkdir(parents=True)
+    keep = hist / "spy_day_2021-12-01_2026-11-16.json"            # starts earlier: kept
+    old = hist / "spy_day_2026-11-10_2026-11-20.json"             # inside the new range: removed
+    keep.write_text(json.dumps(_answer("SPY", "day", ["2021-12-01", "2026-11-16"])))
+    old.write_text(json.dumps(_answer("SPY", "day", ["2026-11-10", "2026-11-20"])))
+    src = tmp_path / "a.json"
+    src.write_text(json.dumps(_answer("SPY", "day", ["2026-11-02", "2026-11-24"])))
+    history.save_history(tmp_path, "spy_day", src)
+    assert sorted(p.name for p in hist.iterdir()) == ["spy_day_2021-12-01_2026-11-16.json",
+                                                      "spy_day_2026-11-02_2026-11-24.json"]
+
+
+def test_newest_download_wins_when_files_overlap(tmp_path):
+    a = tmp_path / "vix_day_2024-06-01_2026-11-16.json"
+    b = tmp_path / "vix_day_2023-11-25_2026-11-24.json"            # newer, but sorts earlier by name
+    a.write_text(json.dumps(_answer("VIX", "day", ["2026-11-16"], value=1.0, index=True)))
+    b.write_text(json.dumps(_answer("VIX", "day", ["2026-11-16"], value=2.0, index=True)))
+    bars, _ = history.load_daily(history.by_age([a, b]))
+    assert bars[date(2026, 11, 16)].close == 2.0
+
+
+def test_save_history_command(tmp_path, capsys):
+    from spybot.__main__ import main
+    src = tmp_path / "a.json"
+    src.write_text(json.dumps(_answer("SPY", "day", ["2026-11-17", "2026-11-18"])))
+    assert main(["save-history", "spy_day", str(src), "--root", str(tmp_path)]) == 0
+    assert "spy_day_2026-11-17_2026-11-18.json" in capsys.readouterr().out
+    src.write_text("{}")
+    assert main(["save-history", "spy_day", str(src), "--root", str(tmp_path)]) == 1
+    assert "BAD" in capsys.readouterr().out

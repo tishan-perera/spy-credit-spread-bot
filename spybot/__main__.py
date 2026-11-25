@@ -1,4 +1,4 @@
-"""Command line: python -m spybot check-history | ingest DAY HHMM | assemble DAY HHMM QUOTES_FILE... | report | final | dashboard [PORT]"""
+"""Command line: python -m spybot check-history | ingest DAY HHMM | assemble DAY HHMM QUOTES_FILE... | report | final | dashboard [PORT] | health [--notify] | save-history KIND FILE..."""
 from __future__ import annotations
 
 import argparse
@@ -26,9 +26,12 @@ def _write(root: Path, name: str, md: str, rows: list[dict]) -> Path:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="spybot")
-    parser.add_argument("command", choices=["check-history", "ingest", "assemble", "report", "final", "dashboard"])
+    parser.add_argument("command", choices=["check-history", "ingest", "assemble", "report", "final", "dashboard", "health", "save-history"])
     parser.add_argument("args", nargs="*")
     parser.add_argument("--root", default=str(PROJECT))
+    parser.add_argument("--notify", action="store_true", help="health: Mac notification for new problems")
+    parser.add_argument("--new-run-problems", action="store_true",
+                        help="health: print only logger-run problems not printed before (for the scheduled runs' push alert)")
     a = parser.parse_args(argv)
     root = Path(a.root)
     today = date.today()
@@ -37,6 +40,31 @@ def main(argv: list[str]) -> int:
         from spybot import dashboard
         dashboard.serve(root, int(a.args[0]) if a.args else 8790)
         return 0
+    if a.command == "save-history":
+        from spybot import history
+        kind, code = a.args[0], 0
+        for src in a.args[1:]:
+            try:
+                print(f"saved {history.save_history(root, kind, Path(src))}")
+            except (OSError, ValueError, KeyError) as e:
+                print(f"BAD: {e}")
+                code = 1
+        return code
+    if a.command == "health":
+        from spybot import health
+        if a.new_run_problems:
+            fresh = health.new_problems(root / "data" / ".health-pushed.json",
+                                        health.run_problems(root, datetime.now().astimezone()))
+            print("\n".join(fresh) if fresh else "none")
+            return 0
+        spy = report._load(root)[0]
+        msgs = health.check(root, datetime.now().astimezone(), max(spy) if spy else None)
+        print("\n".join(msgs) if msgs else "all good")
+        if a.notify:
+            fresh = health.new_problems(root / "data" / ".health-notified.json", msgs)
+            if fresh:
+                health.notify_mac(fresh)
+        return 1 if msgs else 0
     if a.command == "check-history":
         problems = report.check_history(root)
         for p in problems:

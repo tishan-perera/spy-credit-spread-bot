@@ -54,3 +54,38 @@ def test_event_days_are_trading_days():
 def test_2021_christmas_observed_closure():
     # History downloads start 2021-12-01 so the 20-day trend has data on 2022-01-03.
     assert not calendar.is_trading_day(date(2021, 12, 24))
+
+
+# --- which logger runs a day has (early-close days exit at 12:30 / 12:40) ---
+
+def test_log_runs_on_a_normal_day():
+    assert calendar.log_runs(date(2026, 11, 25)) == ("1000", "1015", "1030", "1530", "1540")
+    assert calendar.exit_runs(date(2026, 11, 25)) == ("1530", "1540")
+
+
+def test_log_runs_on_an_early_close_day():
+    assert calendar.log_runs(date(2026, 11, 27)) == ("1000", "1015", "1030", "1230", "1240")
+    assert calendar.exit_runs(date(2026, 12, 24)) == ("1230", "1240")
+
+
+def test_no_log_runs_on_a_holiday():
+    assert calendar.log_runs(date(2026, 11, 26)) == ()
+    assert calendar.log_runs(date(2026, 11, 28)) == ()      # Saturday
+
+
+# --- the calendar must reach far enough ahead ---
+
+def test_calendar_knows_2027_holidays():
+    assert not calendar.is_trading_day(date(2027, 1, 1))     # New Year's Day
+    assert not calendar.is_trading_day(date(2027, 11, 25))   # Thanksgiving 2027
+    assert calendar.close_time(date(2027, 11, 26)) == time(13, 0)
+
+
+def test_calendar_covers_at_least_60_days_from_today():
+    from datetime import date as d, timedelta
+    assert calendar.covered_until() >= d.today() + timedelta(days=60)
+
+
+def test_event_list_covers_at_least_60_days_from_today():
+    from datetime import date as d, timedelta
+    assert calendar.events_covered_until() >= d.today() + timedelta(days=60)

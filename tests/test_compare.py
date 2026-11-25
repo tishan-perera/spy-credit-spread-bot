@@ -61,7 +61,7 @@ def test_v2_uses_call_side_in_downtrend():
 
 def test_afternoon_values():
     snaps = snaps_with(put726=(0.41, 0.42), put721=(0.10, 0.11))
-    snaps["1530"] = snap(time(15, 30), {("put", 726): leg(0.03, 0.04), ("put", 721): leg(0.0, 0.01)})
+    snaps["exit"] = snap(time(15, 30), {("put", 726): leg(0.03, 0.04), ("put", 721): leg(0.0, 0.01)})
     r = row(Setup(5, 1.0, "baseline"), snaps)
     assert r.value_1530 == pytest.approx(0.03) and r.value_1540 is None
 

@@ -53,6 +53,35 @@ def remaining_fraction(day: date, start: time) -> float:
     return minutes / config.TRADING_MINUTES_PER_DAY
 
 
+def exit_runs(day: date) -> tuple[str, str]:
+    """Labels of the exit run and its fallback: 1530/1540, or 1230/1240 on 1 PM early-close days."""
+    first = datetime.combine(day, exit_time(day))
+    fallback = first + (datetime.combine(day, config.EXIT_FALLBACK_TIME) - datetime.combine(day, config.EXIT_TIME))
+    return f"{first:%H%M}", f"{fallback:%H%M}"
+
+
+def log_runs(day: date) -> tuple[str, ...]:
+    """Every logger run planned for a day (none on days without a same-day SPY expiry)."""
+    if not has_0dte(day):
+        return ()
+    morning = tuple(f"{t.hour:02d}{t.minute:02d}" for t in config.LOG_TIMES if t < time(12, 0))
+    return morning + exit_runs(day)
+
+
+@lru_cache(maxsize=None)
+def covered_until() -> date:
+    """Last day the holiday list is known to be complete for."""
+    raw = json.loads((REFERENCE / "market_calendar.json").read_text())
+    return date.fromisoformat(raw["covered_through"])
+
+
+@lru_cache(maxsize=None)
+def events_covered_until() -> date:
+    """Last Fed/CPI/jobs date the event list holds."""
+    raw = json.loads((REFERENCE / "events.json").read_text())
+    return date.fromisoformat(raw["covered_through"])
+
+
 def has_0dte(day: date) -> bool:
     if not is_trading_day(day):
         return False

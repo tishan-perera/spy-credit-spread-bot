@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
-from spybot import calendar, compare, config, ingest, pricetest, report
+from spybot import health, calendar, compare, config, ingest, pricetest, report
 from spybot.pricetest import Setup
 
 ET = ZoneInfo(config.MARKET_TZ)
@@ -35,6 +35,7 @@ EVENT_NAMES = {"fomc": "Fed decision", "cpi": "CPI report", "jobs": "Jobs report
 SLOTS = tuple(f"{t.hour:02d}{t.minute:02d}" for t in config.LOG_TIMES)
 NOTES_RE = re.compile(r"data/raw/(\d{4}-\d{2}-\d{2})/(\d{4})\.notes\.txt")
 TASK_RE = re.compile(r"DAY = (\d{4}-\d{2}-\d{2}) and HHMM = (\d{4})")
+TASK_NAME_RE = re.compile(r'scheduled-task name="spy-logger-(\d{4})"')
 
 
 # --- small formatting helpers --------------------------------------------------
@@ -79,42 +80,35 @@ def logger_runs(root: Path) -> list[dict]:
     return runs
 
 
-def calendar_grid(runs: list[dict], scheduled: list[dict], now: datetime) -> dict:
-    """Last three trading days up to today, plus the next one; each slot ok/bad/missed/next/off."""
-    today = now.astimezone(ET).date()
-    days = [d for d in calendar.trading_days(today - timedelta(days=10), today)][-3:]
-    nxt = today + timedelta(days=1)
+def calendar_grid(root: Path, now: datetime) -> dict:
+    """Last three trading days up to today, plus the next one. Planned runs come from the market
+    calendar; each cell is ok / bad / error / missed / next / planned / off. On 1 PM early-close days
+    the exit runs are 12:30 and 12:40 and are shown in the two exit columns."""
+    days = health.recent_days(now)
+    nxt = days[-1] + timedelta(days=1)
     while not calendar.is_trading_day(nxt):
         nxt += timedelta(days=1)
-    days.append(nxt)
-    done = {(r["day"], r["hhmm"]): r["result"] for r in runs}
-    planned = {(s["day"], s["hhmm"]) for s in scheduled}
+    if nxt > now.astimezone(ET).date():
+        days.append(nxt)
     grid, next_marked = {}, False
     for day in days:
+        runs = health.planned(day)
         row = {}
-        for hhmm in SLOTS:
-            key = (day.isoformat(), hhmm)
-            slot_time = datetime(day.year, day.month, day.day, int(hhmm[:2]), int(hhmm[2:]), tzinfo=ET)
-            if key in done:
-                state = done[key]
-            elif key in planned and slot_time + timedelta(minutes=30) < now:
-                state = "missed"
-            elif key in planned and not next_marked:
-                state, next_marked = "next", True
-            else:
-                state = "off"
-            row[_slot(hhmm)] = state
+        for i, slot in enumerate(SLOTS):
+            if i >= len(runs):
+                row[_slot(slot)] = "off"
+                continue
+            state = health.slot_state(root, day, runs[i], now)
+            if state == "upcoming":
+                state, next_marked = ("planned", next_marked) if next_marked else ("next", True)
+            row[_slot(slot)] = state
         grid[_short(day)] = row
     return grid
 
 
-def next_run(scheduled: list[dict], now: datetime) -> dict | None:
-    ahead = sorted((datetime.fromisoformat(s["when"]), s) for s in scheduled
-                   if datetime.fromisoformat(s["when"]) > now)
-    if not ahead:
-        return None
-    dt, s = ahead[0]
-    return {"iso": s["when"], "when": _when(dt), "what": s.get("what", "")}
+def daily_text() -> str:
+    times = ", ".join(_clock(s) for s in SLOTS)
+    return f"{times} ET on every trading day with a same-day SPY expiry (12:30 and 12:40 exits on 1 PM early-close days)"
 
 
 # --- Claude run records: order audit and logger cost ------------------------------
@@ -149,6 +143,11 @@ def scan_transcripts(folder: Path) -> dict:
         is_logger = "logger-task.md" in first
         m = TASK_RE.search(first)
         usage, label = {}, (m.groups() if m else None)
+        named = TASK_NAME_RE.search(first)
+        started = next((o["timestamp"] for o in lines if o.get("timestamp")), None)
+        if label is None and named and started:      # daily tasks: day from the run's start (ET), time from the task name
+            start = datetime.fromisoformat(started.replace("Z", "+00:00")).astimezone(ET)
+            label = (start.date().isoformat(), named.group(1))
         for obj in lines:
             if obj.get("type") != "assistant":
                 continue
@@ -187,6 +186,16 @@ def scan_transcripts(folder: Path) -> dict:
         first = datetime.fromisoformat(min(p for p in previews if p).replace("Z", "+00:00")).astimezone(ET)
         out["previewWhen"] = f"{_short(first.date())}, {_clock(f'{first:%H%M}')} ET"
     return out
+
+
+def cost_per_day(runs: list[dict]) -> list[dict]:
+    days: dict[str, dict] = {}
+    for r in runs:
+        t = days.setdefault(r["day"], {"day": r["day"], "runs": 0, "output": 0, "write": 0, "reread": 0})
+        t["runs"] += 1
+        for k in ("output", "write", "reread"):
+            t[k] += r[k]
+    return [days[k] for k in sorted(days)]
 
 
 def transcript_folder(root: Path) -> Path:
@@ -258,7 +267,7 @@ def price_test(root: Path) -> dict:
 def _real_rows(root: Path, day: date, pt: dict) -> tuple[dict, bool]:
     """Real rows for one logged day. 'fresh' is False when history lacks the day before."""
     spy = pt["spy"]
-    snaps = {run: ingest.load_snapshot(root, day, run) for run in report.LOG_RUNS}
+    snaps = ingest.load_day(root, day)
     before = [d for d in sorted(spy) if d < day][-config.TREND_LOOKBACK:]
     fresh = len(before) == config.TREND_LOOKBACK and before[-1] == calendar.previous_trading_day(day)
     if snaps["1015"] is None or not before:
@@ -297,12 +306,12 @@ def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None
         if need is not None:
             points.append({"day": _short(d), "band": r.vix_band, "margin": _r(r.mid_credit - need), "vs": vs})
         credits.append({"day": d.isoformat(), "k": k, "mid": _r(r.mid_credit, 2)})
-        snaps = {run: ingest.load_snapshot(root, d, run) for run in ("1015", "1530")}
+        snaps = ingest.load_day(root, d)
         for row in rows.values():
             if row.status != "ok":
                 continue
             for strike in (row.short, row.long):
-                for run, store in (("1015", gaps_in), ("1530", gaps_out)):
+                for run, store in (("1015", gaps_in), ("exit", gaps_out)):
                     leg = snaps[run].legs.get((row.side, strike)) if snaps[run] else None
                     if leg is not None:
                         store[(d, row.side, strike)] = leg.ask - leg.bid
@@ -325,7 +334,8 @@ def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None
             checks += [{"rule": "Gap-down open", "hit": None, "note": why},
                        {"rule": "Trend unclear", "hit": None, "note": why}]
         if r is not None and r.status in ("ok", "skipped"):
-            exit_snap = ingest.load_snapshot(root, d, "1530") or ingest.load_snapshot(root, d, "1540")
+            day_snaps = ingest.load_day(root, d)
+            exit_snap = day_snaps["exit"] or day_snaps["exit_fallback"]
             value = r.value_1530 if r.value_1530 is not None else r.value_1540
             shadow = {"day": _short(d), "spread": f"{r.side.title()} {r.short}/{r.long}", "width": width, "k": k,
                       "status": r.status, "skipped": list(r.skipped),
@@ -348,7 +358,7 @@ def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None
         move, spy_px, vix_px, xday = _r(pricetest.expected_move(inp), 2), morning.spy, morning.vix, _short(d)
 
     return {
-        "usableDays": len(points),
+        "usableDays": sum(1 for rows, fresh in per_day.values() if rows and fresh),   # same rule as the report
         "breakeven": [{"k": kk, "v2": _r(val[Setup(5, kk, "v2")].breakeven.get("cautious")),
                        "base": _r(val[Setup(5, kk, "baseline")].breakeven.get("cautious"))} for kk in report.TABLE_KS],
         "realCredits": credits,
@@ -493,14 +503,14 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
     pt = pt or price_test(root)
     tp = trading_panels(root, pt, manual, today)
     runs = logger_runs(root)
-    scheduled = manual.get("scheduled", [])
-    nxt = next_run(scheduled, now)
+    nxt_dt = health.next_planned(now)
+    nxt = {"iso": nxt_dt.isoformat(), "when": _when(nxt_dt), "what": "Logger run"} if nxt_dt else None
     audit = scan_transcripts(transcripts if transcripts is not None else transcript_folder(root))
     blocked = blocked_tools(root)
     fresh = freshness(max(pt["spy"]), today)
     branch, activity = git_status(root)
     up, up_note = upcoming(pt["events"], today)
-    grid = calendar_grid(runs, scheduled, now)
+    grid = calendar_grid(root, now)
     vix_out = sum(p.startswith("VIX") for p in pt["problems"])
 
     alerts = []
@@ -510,10 +520,10 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         alerts.append({"level": "red", "text": f"{audit['orderCalls']} order-tool calls found in run records. Check now."})
     if not blocked["orders"] or not blocked["previews"]:
         alerts.append({"level": "red", "text": "Project settings do not block every order or order-preview tool."})
-    for day, row in grid.items():
-        for slot, state in row.items():
-            if state in ("bad", "missed"):
-                alerts.append({"level": "red", "text": f"Logger run {day} {slot} {'failed the check' if state == 'bad' else 'never ran'}."})
+    for text in health.run_problems(root, now):
+        alerts.append({"level": "red", "text": text})
+    for text in health.coverage_problems(now):
+        alerts.append({"level": "amber", "text": text})          # calendar / event list running out
     if fresh["behindDays"]:
         alerts.append({"level": "amber", "text": f"Price history is {fresh['behindDays']} trading day(s) behind "
                        f"(last day {fresh['last']}; missing {', '.join(fresh['missing'])}). Plan v2's trend and gap-down rules can't be checked for the latest days."})
@@ -546,7 +556,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
              "detail": "Any order tool would execute for real, which is why order tools stay blocked (set by hand; the dashboard does not ask Robinhood)"}],
         "tests": tests,
         "branch": branch,
-        "logger": {"daily": manual.get("daily", ""), "next": nxt, "usableDays": tp["usableDays"],
+        "logger": {"daily": daily_text(), "next": nxt, "usableDays": tp["usableDays"],
                    "runs": runs, "schedule": [_slot(s) for s in SLOTS]},
         "history": {"spyBars": len(pt["spy"]), "from": min(pt["spy"]).isoformat(), "to": max(pt["spy"]).isoformat(),
                     "intradayFrom": min(pt["intraday"]).isoformat() if pt["intraday"] else None,
@@ -555,7 +565,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         "decisions": manual.get("decisions", []), "activity": activity,
         "nextRunISO": nxt["iso"] if nxt else None,
         "alerts": alerts, "calendar": grid,
-        "costs": {"budgetPerDay": manual.get("tokenBudgetPerDay", 250000), "runs": costs},
+        "costs": {"budgetPerDay": manual.get("tokenBudgetPerDay", 250000), "runs": costs, "perDay": cost_per_day(costs)},
         "freshness": fresh,
         "audit": {**{k: audit[k] for k in ("transcripts", "toolCalls", "orderCalls", "previewCalls", "previewWhen")},
                   "denyRulesCoverPreview": blocked["previews"], "guardTest": "pass" if not tests.get("failed") else "check"},

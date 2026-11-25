@@ -66,8 +66,8 @@ def real_row(day: date, setup: Setup, snaps: dict[str, Snapshot | None],
         natural_credit=s.bid - l.ask,
         short_delta=s.delta,
         leg_gaps=(s.ask - s.bid, l.ask - l.bid),
-        value_1530=_spread_mid(snaps.get("1530"), side, short, long_),
-        value_1540=_spread_mid(snaps.get("1540"), side, short, long_),
+        value_1530=_spread_mid(snaps.get("exit"), side, short, long_),          # 3:30 (12:30 on early closes)
+        value_1540=_spread_mid(snaps.get("exit_fallback"), side, short, long_),  # 3:40 (12:40)
         vix_band=band,
     )
 
