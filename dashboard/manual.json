@@ -13,9 +13,6 @@
     {"n": 5, "name": "Fully automatic", "state": "later", "note": ""}
   ],
   "decisions": [
-    {"title": "Approve the 5 daily logger runs", "why": "After tomorrow's 10:15 test passes. Each run is a scheduled Claude task; the Mac must be awake.", "urgent": true},
-    {"title": "Update CLAUDE.md 'Current work' to the new plan", "why": "It still points at the old Phase A plan, so a fresh session could follow the wrong plan.", "urgent": false},
-    {"title": "Merge the price-test branch into main", "why": "All tests pass. Until merged, main holds the old code.", "urgent": false},
     {"title": "Set the evidence target (days of logging)", "why": "60 is a placeholder. More days means a surer verdict but a longer wait.", "urgent": false},
     {"title": "Account size vs. $5 width", "why": "Account cash is small: one $5-wide max loss is about $475, far above plan v2's 1–2% limit. Matters only before live trading.", "urgent": false}
   ]
