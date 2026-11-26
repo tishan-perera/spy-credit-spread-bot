@@ -380,8 +380,8 @@ def trading_panels(root: Path, pt: dict, manual: dict, today: date | None = None
 
 # --- profitability (would-be trades priced with real logged quotes; no orders) ------------
 
-def profit_days(root: Path, pt: dict, manual: dict, today: date, n: int = 10) -> list[dict]:
-    """One entry per trading day from the first 10:15 log to today (last n days).
+def profit_days(root: Path, pt: dict, manual: dict, today: date) -> list[dict]:
+    """One entry per trading day from the first 10:15 log to today.
 
     state: done (entry and exit priced) | no exit | no entry | no runs | sat out (rules skipped the day)
     """
@@ -393,7 +393,7 @@ def profit_days(root: Path, pt: dict, manual: dict, today: date, n: int = 10) ->
         return []
     val = pt["sweeps"]["validation"]
     out = []
-    for d in calendar.trading_days(min(firsts), today)[-n:]:
+    for d in calendar.trading_days(min(firsts), today):
         folder = snap_root / d.isoformat()
         rows, fresh = _real_rows(root, d, pt)
         setup = Setup(width, k, "v2" if fresh else "baseline")
@@ -419,6 +419,23 @@ def profit_days(root: Path, pt: dict, manual: dict, today: date, n: int = 10) ->
                 e.update(state="done", result=result_per_contract(r.mid_credit, value, "cautious"),
                          best=result_per_contract(r.mid_credit, value, "best"))
         out.append(e)
+    return out
+
+
+def profit_months(first: date, today: date) -> list[dict]:
+    """Month grids for the profit calendar: every weekday of each month from first to today,
+    marked open (market trading) and early (1 PM close)."""
+    out, m = [], date(first.year, first.month, 1)
+    while m <= today:
+        nxt = date(m.year + m.month // 12, m.month % 12 + 1, 1)
+        days, d = [], m
+        while d < nxt:
+            if d.weekday() < 5:
+                days.append({"date": d.isoformat(), "open": calendar.is_trading_day(d),
+                             "early": calendar.close_time(d).hour == 13})
+            d += timedelta(days=1)
+        out.append({"month": f"{m:%Y-%m}", "label": f"{m:%B %Y}", "days": days})
+        m = nxt
     return out
 
 
@@ -455,6 +472,7 @@ def profitability(root: Path, pt: dict, manual: dict, today: date) -> dict:
     s = pt["sweeps"]["validation"][Setup(width, k, variant)]
     return {**profit_summary(days, width), "days": days, "width": width, "k": k,
             "rules": "Plan v2" if fresh else "Sell every day",
+            "months": profit_months(date.fromisoformat(days[0]["date"]), today) if days else [],
             "historyEnd": _short(max(pt["spy"])), "targetDays": manual.get("evidenceTargetDays", 60),
             "backtest": {"winRate": _r(1 - s.loss_rate, 3) if s.loss_rate is not None else None,
                          "fullLossRate": _r(s.full_loss_rate, 3), "days": s.n_traded,
@@ -547,6 +565,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
     profit = profitability(root, pt, manual, today)
     return {
         "asOf": f"{now:%a} {_short(today)}, {now.year} · {_clock(f'{now:%H%M}')} ET",
+        "asOfISO": today.isoformat(),
         "stages": manual.get("stages", []),
         "safety": [
             {"label": "Orders placed by the bot", "value": str(audit["orderCalls"]), "ok": audit["orderCalls"] == 0,

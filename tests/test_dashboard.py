@@ -120,7 +120,7 @@ def test_collect_on_real_project_is_json_and_has_every_panel(tmp_path):
     json.dumps(s)
     for key in ("asOf", "stages", "safety", "tests", "branch", "logger", "breakeven", "realCredits",
                 "decisions", "activity", "alerts", "calendar", "costs", "freshness", "audit", "shadow",
-                "evidence", "slippage", "skipBoard", "upcoming", "eod", "explorer", "profit"):
+                "evidence", "slippage", "skipBoard", "upcoming", "eod", "explorer", "profit", "asOfISO"):
         assert key in s, key
     # 9.34: with history through Nov 17 (refreshed 2026-11-25) Nov 18 is judged by plan v2 (call 742/747);
     # before the refresh it fell back to sell-every-day (17.34)
@@ -286,3 +286,20 @@ def test_every_progress_counter_uses_finished_days(tmp_path):
     assert s["verdictDays"] == s["profit"]["finished"]
     if (ROOT / "data" / "snapshots" / "2026-11-24" / "1530.json").exists():
         assert s["verdictDays"] == 2       # Nov 18 and Nov 24; Nov 19 had no 3:30 log, Nov 25 sat out
+
+
+def test_profit_months_lists_every_weekday_with_market_status():
+    months = dashboard.profit_months(date(2026, 11, 18), date(2026, 12, 3))
+    assert [m["month"] for m in months] == ["2026-11", "2026-12"]
+    nov = {d["date"]: d for d in months[0]["days"]}
+    assert months[0]["label"] == "November 2026"
+    assert min(nov) == "2026-11-02" and max(nov) == "2026-11-30"   # weekdays only, whole month
+    assert len(nov) == 21 and "2026-11-21" not in nov              # no weekends
+    assert nov["2026-11-26"]["open"] is False                      # Thanksgiving
+    assert nov["2026-11-27"]["early"] is True and nov["2026-11-24"]["early"] is False
+
+
+def test_profit_days_cover_every_trading_day_since_the_first_log():
+    pt = dashboard.price_test(ROOT)
+    days = dashboard.profit_days(ROOT, pt, {"shadow": {"width": 5, "k": 1.0}}, date(2027, 1, 29))
+    assert days[0]["date"] == "2026-11-18" and days[-1]["date"] == "2027-01-29"   # no 10-day cap
