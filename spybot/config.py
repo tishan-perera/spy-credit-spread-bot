@@ -51,3 +51,9 @@ STALE_DROP_MAX_SHARE = 0.05   # up to 5% of contracts may be dropped as stale; m
 # Thursday expiries were first listed 2022-11-16 (first expiry Thu 2022-11-17).
 # Source: https://cdn.cboe.com/resources/product_update/2022/Update-Cboe-Options-to-List-SPY-and-QQQ-Tuesday-and-Thursday-Expiring-Weekly-Options.pdf
 TUE_THU_0DTE_START = date(2022, 11, 15)
+
+# Paper trading (stage 3), owner-approved 2026-11-26
+EDGE_MARGIN = 0.02                 # trade only if the midpoint credit >= cautious break-even + $0.02 a share
+LOSS_STREAK_HALT = 3               # three losing paper trades in a row: no new trades until next week
+WEEKLY_LOSS_LIMIT_MAX_LOSSES = 1   # losing one max loss in a week: no new trades until next week
+PAPER_DAYS_TARGET = 30             # plan v2: paper trade at least 30 to 60 trading days

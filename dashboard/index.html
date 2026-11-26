@@ -108,6 +108,7 @@ select{background:var(--surface);color:var(--navy);border:1px solid var(--border
 <nav id="nav"></nav>
 <section class="tab" id="t-overview"><div class="grid" id="overview"></div></section>
 <section class="tab" id="t-profit"><div class="grid" id="profit"></div></section>
+<section class="tab" id="t-paper"><div class="grid" id="paper"></div></section>
 <section class="tab" id="t-evidence"><div class="grid" id="evidence"></div></section>
 <section class="tab" id="t-safety"><div class="grid" id="safety"></div></section>
 <section class="tab" id="t-explorer"><div class="grid" id="explorer"></div></section>
@@ -260,10 +261,32 @@ function profitTab(){const P=S.profit,B=P.backtest,g=P.gauge,days=P.days;
   <div class="foot">${P.rules=='Plan v2'?'History is up to date, so plan v2 is scored.':"Plan v2's trend and gap-down checks need up-to-date prices. Until then, results use the simpler rule."}</div></div>`;
  document.querySelectorAll('#profit [data-cal]').forEach(b=>b.onclick=()=>{calMonth=P.months[+b.dataset.cal].month;try{localStorage.setItem('calMonth',calMonth)}catch(e){}profitTab()});}
 
+function paperTab(){const P=S.paper,T=P.today,sm=P.summary;
+ const act=a=>a=='trade'?'<span class="chip ok"><i></i>trade</span>':a=='skip'?'<span class="chip"><i></i>skip</span>':'<span class="chip"><i></i>no data</span>';
+ const ticket=T?`<div class="row"><span>Today</span><span>${act(T.action)}</span></div>
+   ${T.spread?`<div class="row"><span>Spread</span><span class="num">${esc(T.spread)} · $${P.width} wide</span></div>`:''}
+   ${T.limit!=null?`<div class="row"><span>Start limit / floor</span><span class="num">${money(T.limit)} / ${money(T.floor)}</span></div>`:''}
+   ${T.maxLoss!=null?`<div class="row"><span>Max loss, 1 contract</span><span class="num">${money(T.maxLoss)}</span></div>`:''}
+   <div class="sub" style="margin-top:4px">${esc(T.text)}</div>`
+   :`<div class="sub">No ticket yet today. It appears after the 10:15 run is logged.</div>`;
+ const gate=P.gate.map(c=>`<div class="row"><span>${dot(c.ok?'ok':'')}${esc(c.check)}</span><span class="num">${esc(c.value)}</span></div>`).join('');
+ const rows=P.ledger.slice().reverse().map(e=>`<div class="row"><span><span class="mono">${esc(e.day)}</span> ${act(e.action)} ${e.spread?`<span class="mono s3">${esc(e.spread)}</span>`:''}<br><span class="s3" style="font-size:12px">${esc(e.action=='trade'?'exit: '+(e.exit||'pending'):e.reason)}</span></span><span class="num">${e.result==null?(e.action=='trade'?'open':'–'):sgn(e.result)}</span></div>`).join('');
+ const halt=P.ledger.slice().reverse().find(e=>/halted/.test(e.reason||''));
+ const maxLoss=(P.ledger.find(e=>e.maxLoss)||{}).maxLoss;
+ document.getElementById('paper').innerHTML=`
+ <div class="p span2">${h3("Today's ticket",'What plan v2 would do at 10:15: skip rules, trend, strikes, and the edge gate (credit must clear the cautious break-even plus $'+P.margin.toFixed(2)+'). Paper only: the bot never places orders. In a live stage you would place and close it yourself in the Robinhood app.')}${ticket}</div>
+ <div class="p span2">${h3('Go-live gate','Every line must pass before any real trade. Thresholds come from plan v2 and your choices; the account line is set by you in dashboard/manual.json.',P.gatePasses?'<span class="chip ok"><i></i>passes</span>':'<span class="chip"><i></i>not yet</span>')}${gate}
+  <div class="foot">Even when it passes, going live is your decision, and you place every order yourself.</div></div>
+ <div class="p">${h3('Paper days','Trading days the ticket was evaluated (traded or skipped).')}<div class="big">${sm.days}<span class="s3" style="font-size:16px"> / ${P.targetDays}</span></div><div class="meter"><i style="width:${Math.min(100,sm.days/P.targetDays*100)}%"></i></div></div>
+ <div class="p">${h3('Paper result','After fees and cautious slippage, per contract.')}<div class="big">${sgn(sm.total)}</div><div class="sub">${sm.wins} won · ${sm.losses} lost · ${sm.trades} trades</div></div>
+ <div class="p">${h3('Worst paper trade','')}<div class="big">${sm.worst==null?'–':sgn(sm.worst)}</div><div class="sub">a full loss would be about ${money(maxLoss)}</div></div>
+ <div class="p">${h3('Guardrails','Three losses in a row, or losing one max loss in a week, stops new paper trades until next week.')}<div class="sub">${halt&&halt.date>=S.asOfISO?esc(halt.reason):'None active.'}</div></div>
+ <div class="p span4">${h3('Paper ledger','Newest first. Entry at the 10:15 midpoint minus cautious slippage; exit at 3:30 (3:40 fallback, else the day\'s close).')}${rows||'<div class="sub">nothing yet</div>'}</div>`;}
+
 function render(){
  const alerts=S.alerts,safetyBad=S.safety.filter(x=>!x.ok&&!x.label.includes('approve')).length;
  document.getElementById('clock').textContent=S.asOf+' · refreshes every minute';
- const tabs=[['overview','Overview',alerts.length],['profit','Profitability',0],['evidence','Evidence',0],['safety','Safety & cost',safetyBad],['explorer','Explorer',0]];
+ const tabs=[['overview','Overview',alerts.length],['profit','Profitability',0],['paper','Paper trading',0],['evidence','Evidence',0],['safety','Safety & cost',safetyBad],['explorer','Explorer',0]];
  document.getElementById('nav').innerHTML=tabs.map(([id,l,n])=>`<button data-t="${id}">${l}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
  const T=S.tests,ok=T.failed==0&&!T.error,ud=S.verdictDays,tgt=S.evidence.targetDays,nx=S.logger.next;
@@ -286,6 +309,7 @@ function render(){
  <div class="p span2">${h3('Latest changes','The most recent saved changes (git commits) to the project.')}<pre class="log">${S.activity.map(a=>esc(a.when+'  '+a.what)).join('\n')}</pre></div>`;
 
  profitTab();
+ paperTab();
 
  /* EVIDENCE */
  const ev=S.evidence,sl=S.slippage,counts=BANDS.map(([b])=>S.profit.days.filter(d=>d.state=='done'&&d.band==b).length);

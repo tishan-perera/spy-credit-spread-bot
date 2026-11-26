@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote
 from zoneinfo import ZoneInfo
 
-from spybot import health, calendar, compare, config, ingest, pricetest, report
+from spybot import health, calendar, compare, config, ingest, paper, pricetest, report
 from spybot.pricetest import Setup
 
 ET = ZoneInfo(config.MARKET_TZ)
@@ -481,6 +481,42 @@ def profitability(root: Path, pt: dict, manual: dict, today: date) -> dict:
                          "needAll": _r(s.breakeven.get("cautious"))}}
 
 
+def paper_panel(root: Path, pt: dict, manual: dict, today: date, leg_gap: float | None) -> dict:
+    """Stage 3: today's ticket, the paper ledger with guardrails, and the go-live gate."""
+    root = Path(root)
+    width, k = manual.get("shadow", {}).get("width", 5), manual.get("shadow", {}).get("k", 1.0)
+    snap_root = root / "data" / "snapshots"
+    firsts = [date.fromisoformat(p.name) for p in snap_root.glob("*") if (p / "1015.json").exists()]
+    firsts = [d for d in firsts if d <= today]
+    val = pt["sweeps"]["validation"]
+    days = []
+    for d in calendar.trading_days(min(firsts), today) if firsts else []:
+        rows, fresh = _real_rows(root, d, pt)
+        setup = Setup(width, k, "v2" if fresh else "baseline")
+        r = rows.get(setup)
+        need = val[setup].by_band.get(r.vix_band, (0, None))[1] if r is not None and r.vix_band else None
+        close = pt["spy"][d].close if d in pt["spy"] and d < today else None
+        days.append(paper.DayIn(d, r, need, close))
+    led = paper.ledger(days)
+    rows_out = [{"date": e.day.isoformat(), "day": _short(e.day), "action": e.action, "reason": e.reason,
+                 "spread": f"{e.ticket.side.title()} {e.ticket.short}/{e.ticket.long}" if e.ticket.side else None,
+                 "credit": e.ticket.limit, "floor": e.ticket.floor, "exit": e.exit_source,
+                 "exitValue": _r(e.exit_value, 2), "result": e.result, "maxLoss": e.max_loss} for e in led]
+    last = led[-1] if led else None
+    today_t = None
+    if last is not None and last.day == today:
+        t = last.ticket
+        today_t = {"date": today.isoformat(), "action": t.action, "reason": t.reason, "text": t.text,
+                   "spread": f"{t.side.title()} {t.short}/{t.long}" if t.side else None,
+                   "limit": t.limit, "floor": t.floor, "maxLoss": t.max_loss}
+    logged = len([d for d in firsts])
+    gate = paper.go_live_gate(logged, manual.get("evidenceTargetDays", 60), led, leg_gap,
+                              bool(manual.get("accountRuleMet", False)))
+    return {"today": today_t, "ledger": rows_out, "summary": paper.summary(led), "gate": gate,
+            "gatePasses": paper.gate_passes(gate), "targetDays": config.PAPER_DAYS_TARGET,
+            "margin": config.EDGE_MARGIN, "width": width, "k": k}
+
+
 # --- git and tests ---------------------------------------------------------------------
 
 def _git(root: Path, *args: str) -> str:
@@ -563,6 +599,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
 
     costs = [r for r in audit["loggerRuns"]]
     profit = profitability(root, pt, manual, today)
+    paper_p = paper_panel(root, pt, manual, today, tp["slippage"].get("legGap1015"))
     return {
         "asOf": f"{now:%a} {_short(today)}, {now.year} · {_clock(f'{now:%H%M}')} ET",
         "asOfISO": today.isoformat(),
@@ -597,6 +634,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         "eod": {"day": _short(date.fromisoformat(latest)) if latest else "–", "lines": eod_lines},
         "explorer": tp["explorer"],
         "profit": profit,
+        "paper": paper_p,
         "verdictDays": profit["finished"],     # the one progress count shown on every tab
     }
 
@@ -673,6 +711,17 @@ def serve(root: Path, port: int = 8790) -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"Dashboard: http://127.0.0.1:{port}  (read-only; Ctrl+C to stop)", flush=True)
     threading.Thread(target=cache.get, daemon=True).start()     # warm up
+
+    def _alerts_loop():                    # paper ticket + 3:25 PM close reminder, as Mac notifications
+        from spybot import alerts
+        while True:
+            try:
+                alerts.step(cache.get(), datetime.now(ET), root / "data" / "paper" / "notified.json")
+            except Exception as e:         # never let alerts stop the page
+                print(f"alerts: {type(e).__name__}: {e}", flush=True)
+            _time.sleep(60)
+
+    threading.Thread(target=_alerts_loop, daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

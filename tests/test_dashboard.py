@@ -303,3 +303,17 @@ def test_profit_days_cover_every_trading_day_since_the_first_log():
     pt = dashboard.price_test(ROOT)
     days = dashboard.profit_days(ROOT, pt, {"shadow": {"width": 5, "k": 1.0}}, date(2027, 1, 29))
     assert days[0]["date"] == "2026-11-18" and days[-1]["date"] == "2027-01-29"   # no 10-day cap
+
+
+@pytest.mark.skipif(not (ROOT / "data" / "snapshots" / "2026-11-24").exists(), reason="no Nov 24 log")
+def test_paper_panel_replays_logged_days(tmp_path):
+    s = dashboard.collect(ROOT, datetime(2026, 11, 24, 16, 52, tzinfo=ET),
+                          tests={"passed": 1, "failed": 0}, transcripts=tmp_path)
+    p = s["paper"]
+    json.dumps(p)
+    by_day = {e["date"]: e for e in p["ledger"]}
+    assert by_day["2026-11-18"]["action"] == "trade" and by_day["2026-11-18"]["result"] == pytest.approx(9.34)
+    assert by_day["2026-11-24"]["result"] == pytest.approx(9.34)
+    assert p["today"]["date"] == "2026-11-24" and p["today"]["action"] in ("trade", "skip", "no data")
+    assert [c["check"] for c in p["gate"]][0] == "Logged days" and p["gatePasses"] is False
+    assert p["summary"]["days"] >= 2 and p["targetDays"] == 30

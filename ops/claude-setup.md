@@ -20,6 +20,8 @@ Code never talks to Robinhood directly. A Claude session calls the read tools, w
 ## Dashboard
 Started from a Claude chat, the dashboard is stopped whenever that chat sits idle for 30 minutes or the app updates itself (seen 2026-11-19). So it runs as a macOS background service instead: it starts at login and restarts within about 30 seconds if it stops. `.claude/launch.json` only opens the page; it does not start a second copy.
 
+The service also sends two Mac notifications on paper-trading days: "paper ticket" once the 10:15 ticket says trade, and a close reminder 5 minutes before the exit (3:25 PM, or 12:25 PM on early-close days). Each is sent at most once a day (`data/paper/notified.json`). They never place or close anything.
+
 ## The no-orders safety net (four layers)
 
 Robinhood's "approve trades" setting is off on the account, so any order tool would trade for real. Nothing in this project may place, change or cancel an order.

@@ -4,11 +4,12 @@
   "approveTrades": "OFF",
   "evidenceTargetDays": 60,
   "tokenBudgetPerDay": 250000,
+  "accountRuleMet": false,
   "shadow": {"width": 5, "k": 1.0},
   "stages": [
     {"n": 1, "name": "Logging only", "state": "now", "note": "Price test built; logger being tested"},
     {"n": 2, "name": "Backtest proves the edge", "state": "blocked", "note": "Needs paid data to fully pass; free version can only rule ideas out"},
-    {"n": 3, "name": "Paper trading (30–60 days)", "state": "later", "note": ""},
+    {"n": 3, "name": "Paper trading (30–60 days)", "state": "now", "note": "Paper ledger replays each logged day with cautious costs; no orders"},
     {"n": 4, "name": "Live, approve each trade", "state": "later", "note": ""},
     {"n": 5, "name": "Fully automatic", "state": "later", "note": ""}
   ],
