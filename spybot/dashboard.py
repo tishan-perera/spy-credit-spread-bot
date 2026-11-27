@@ -245,7 +245,7 @@ def price_test(root: Path) -> dict:
     spy, vix, intraday, problems = report._load(root)
     events = calendar.event_days()
     inputs = []
-    for day in calendar.trading_days(config.HISTORY_START, max(spy)):
+    for day in calendar.trading_days(config.HISTORY_START, max(spy, default=config.HISTORY_START)):
         if calendar.has_0dte(day) and (pricetest.in_period(day, "train") or pricetest.in_period(day, "validation")):
             inp = pricetest.build_inputs(day, spy, vix, intraday, events)
             if inp:
@@ -473,7 +473,7 @@ def profitability(root: Path, pt: dict, manual: dict, today: date) -> dict:
     return {**profit_summary(days, width), "days": days, "width": width, "k": k,
             "rules": "Plan v2" if fresh else "Sell every day",
             "months": profit_months(date.fromisoformat(days[0]["date"]), today) if days else [],
-            "historyEnd": _short(max(pt["spy"])), "targetDays": manual.get("evidenceTargetDays", 60),
+            "historyEnd": _short(max(pt["spy"], default=config.HISTORY_START)), "targetDays": manual.get("evidenceTargetDays", 60),
             "backtest": {"winRate": _r(1 - s.loss_rate, 3) if s.loss_rate is not None else None,
                          "fullLossRate": _r(s.full_loss_rate, 3), "days": s.n_traded,
                          "lossDaysPerYear": round(s.loss_rate * s.n_traded) if s.loss_rate is not None else None,
@@ -564,7 +564,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
     nxt = {"iso": nxt_dt.isoformat(), "when": _when(nxt_dt), "what": "Logger run"} if nxt_dt else None
     audit = scan_transcripts(transcripts if transcripts is not None else transcript_folder(root))
     blocked = blocked_tools(root)
-    fresh = freshness(max(pt["spy"]), today)
+    fresh = freshness(max(pt["spy"], default=config.HISTORY_START), today)
     branch, activity = git_status(root)
     up, up_note = upcoming(pt["events"], today)
     grid = calendar_grid(root, now)
@@ -618,7 +618,7 @@ def collect(root: Path, now: datetime, tests: dict, transcripts: Path | None = N
         "branch": branch,
         "logger": {"daily": daily_text(), "next": nxt, "usableDays": tp["usableDays"],
                    "runs": runs, "schedule": [_slot(s) for s in SLOTS]},
-        "history": {"spyBars": len(pt["spy"]), "from": min(pt["spy"]).isoformat(), "to": max(pt["spy"]).isoformat(),
+        "history": {"spyBars": len(pt["spy"]), "from": min(pt["spy"], default=config.HISTORY_START).isoformat(), "to": max(pt["spy"], default=config.HISTORY_START).isoformat(),
                     "intradayFrom": min(pt["intraday"]).isoformat() if pt["intraday"] else None,
                     "vixExcluded": vix_out},
         "breakeven": tp["breakeven"], "realCredits": tp["realCredits"],

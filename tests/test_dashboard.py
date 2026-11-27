@@ -219,6 +219,7 @@ def test_static_file_serves_bundled_fonts_only():
 
 # --- workflow health on the dashboard (planned runs come from the calendar) ---
 
+@pytest.mark.skipif(not (ROOT / "data" / "history").exists(), reason="no local price history")
 def test_usable_days_match_the_report(tmp_path):
     from spybot import report
     today = date(2026, 11, 25)
@@ -245,6 +246,7 @@ def test_calendar_comes_from_the_market_calendar(tmp_path):
     assert grid["Nov 27"]["3:30"] == "planned"             # its exit runs are 12:30/12:40, shown in the exit columns
 
 
+@pytest.mark.skipif(not (ROOT / "data" / "history").exists(), reason="no local price history")
 def test_dashboard_alerts_and_next_run_come_from_health(tmp_path):
     s = dashboard.collect(tmp_path, datetime(2026, 11, 25, 16, 30, tzinfo=ET), tests={"passed": 1, "failed": 0},
                           transcripts=tmp_path, pt=dashboard.price_test(ROOT))
@@ -279,6 +281,7 @@ def test_calendar_shows_runs_that_happened_before_the_daily_schedule(tmp_path):
     assert grid["Nov 23"] == {"10:00": "off", "10:15": "off", "10:30": "off", "3:30": "ok", "3:40": "ok"}
 
 
+@pytest.mark.skipif(not (ROOT / "data" / "history").exists(), reason="no local price history")
 def test_every_progress_counter_uses_finished_days(tmp_path):
     # One definition on every tab: a day counts once its would-be trade has a real 10:15 entry and 3:30 exit.
     s = dashboard.collect(ROOT, datetime(2026, 11, 25, 16, 30, tzinfo=ET),
@@ -299,6 +302,8 @@ def test_profit_months_lists_every_weekday_with_market_status():
     assert nov["2026-11-27"]["early"] is True and nov["2026-11-24"]["early"] is False
 
 
+@pytest.mark.skipif(not (ROOT / "data" / "history").exists(), reason="no local price history")
+@pytest.mark.skipif(not (ROOT / "data" / "snapshots" / "2026-11-18").exists(), reason="no Nov 18 log")
 def test_profit_days_cover_every_trading_day_since_the_first_log():
     pt = dashboard.price_test(ROOT)
     days = dashboard.profit_days(ROOT, pt, {"shadow": {"width": 5, "k": 1.0}}, date(2027, 1, 29))
@@ -317,3 +322,12 @@ def test_paper_panel_replays_logged_days(tmp_path):
     assert p["today"]["date"] == "2026-11-24" and p["today"]["action"] in ("trade", "skip", "no data")
     assert [c["check"] for c in p["gate"]][0] == "Logged days" and p["gatePasses"] is False
     assert p["summary"]["days"] >= 2 and p["targetDays"] == 30
+
+
+def test_dashboard_works_on_a_new_computer_with_no_data(tmp_path):
+    # SETUP.md installs the dashboard service before any price history is downloaded.
+    pt = dashboard.price_test(tmp_path)
+    assert pt["inputs"] == []
+    s = dashboard.collect(tmp_path, datetime(2026, 11, 25, 16, 30, tzinfo=ET),
+                          tests={"passed": 1, "failed": 0}, transcripts=tmp_path, pt=pt)
+    json.dumps(s)

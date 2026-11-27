@@ -53,7 +53,7 @@ cd ~/SPY-Credit-Spread-Bot && python3 -m venv .venv && .venv/bin/pip install -r 
 ```bash
 cd ~/SPY-Credit-Spread-Bot && .venv/bin/python -m pytest -q
 ```
-**Expected:** every test passes. One dashboard test may be skipped with "no local price history"; that's fine until step 9. Any failure: stop and show the owner the failing test names. Then create `data/setup-progress.md` and record steps 1–2.
+**Expected:** every test passes. About 8 dashboard tests are skipped with reasons such as "no local price history" or "no Nov 24 log": they read real data that only exists after steps 4 and 9. Any failure: stop and show the owner the failing test names. Then create `data/setup-progress.md` and record steps 1–2.
 
 ### Step 3. Private files (owner types the digits)
 ```bash
@@ -151,7 +151,7 @@ Call `get_equity_quotes` with symbols `["SPY"]`, and nothing else. **Expected:**
    **Expected:**
    - `check-history` shows only the problems explained in [docs/history-notes.md](docs/history-notes.md).
    - `report` writes `reports/backtest-<today>.md`.
-   - All tests pass with no skips.
+   - All tests pass. Tests marked "no … log" stay skipped only if the logged data could not be restored in step 4.
    - **Never run `python -m spybot final`.** It opens the sealed test period.
 
 ### Step 10. Scheduled runs (show the owner this table, then ask)
