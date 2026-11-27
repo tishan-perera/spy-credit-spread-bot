@@ -1,6 +1,6 @@
 # Daily logger run: prompt template
 
-Replace `HHMM` with `1000`, `1015`, `1030`, `1530` or `1540` (recurring weekday tasks), or `1230` / `1240` (one-time tasks on 1 PM early-close days). `DAY` is worked out by the run itself.
+In the text below the line, change only `HHMM = HHMM` to the run's label, for example `HHMM = 1015`. Labels: `1000`, `1015`, `1030`, `1530` or `1540` (recurring weekday tasks), or `1230` / `1240` (one-time tasks on 1 PM early-close days). Leave every other `HHMM` as it is; the run fills those in itself. `DAY` is worked out by the run itself.
 
 ---
 

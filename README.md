@@ -4,6 +4,8 @@
 
 I come from accounting, not software. I designed the strategy, the rules and the safety limits, and directed an AI coding agent ([Claude Code](https://claude.com/claude-code)) to build and test it. Every number in this project is checked against real data, and every assumption is written down.
 
+> **New computer?** Open Claude Code and paste: *"Set up my SPY bot on this computer from https://github.com/tishan-perera/spy-credit-spread-bot. Clone it and follow SETUP.md in that repo exactly, step by step."* See [SETUP.md](SETUP.md).
+
 > **Current stage: research only.** The system downloads market data, runs a backtest and records real option prices each day. It cannot place trades: order tools are blocked in four separate ways (see [Safety](#safety-first)). Nothing here is financial advice.
 
 ---
@@ -72,7 +74,7 @@ The guiding rule is **"when unsure, do nothing and ask."** A second automatic te
 | How it works, in plain words | [docs/how-it-works.md](docs/how-it-works.md) and the [glossary](docs/glossary.md) |
 | The strategy rules | [docs/plan-v2.md](docs/plan-v2.md) |
 | The full design and build plan | [docs/superpowers/](docs/superpowers/) |
-| To rebuild it on a new computer | [RECOVERY.md](RECOVERY.md) |
+| To rebuild it on a new computer | [SETUP.md](SETUP.md): give Claude Code the repo link and it does the rest |
 | Everything else | [docs/README.md](docs/README.md) |
 
 ## Roadmap

@@ -19,7 +19,7 @@
 - [../reports/](../reports/): backtest reports (Markdown and CSV)
 
 ## Running and rebuilding
-- [../RECOVERY.md](../RECOVERY.md): rebuild everything on a new computer
+- [../SETUP.md](../SETUP.md): rebuild everything on a new computer (Claude Code follows it from the repo link)
 - [../ops/claude-setup.md](../ops/claude-setup.md): Claude app, Robinhood connector, plugins, the no-orders safety net
 - [../ops/scheduled-tasks/](../ops/scheduled-tasks/): the daily logger schedule and prompt
 - [../collector/logger-task.md](../collector/logger-task.md): what each logger run does, step by step

@@ -1,6 +1,6 @@
 # Claude setup for this project
 
-The bot's "agents" are Claude Code sessions. This page lists everything outside the code that has to exist on a computer for them to work. The step-by-step rebuild is in [RECOVERY.md](../RECOVERY.md).
+The bot's "agents" are Claude Code sessions. This page lists everything outside the code that has to exist on a computer for them to work. The step-by-step rebuild is in [SETUP.md](../SETUP.md).
 
 ## What runs where
 
@@ -41,4 +41,4 @@ A connector's tools are named `mcp__<server name>__<tool>`. The server name can 
 - Account numbers, balances, emails and tokens never go into tracked files. `tests/test_public_safety.py` checks every tracked file on each test run.
 - Private details go in `CLAUDE.local.md` (copy from `CLAUDE.local.example.md`).
 - Private strings to block go one per line in `.private-patterns`. Both files are git-ignored.
-- Market data (`data/`) is git-ignored. It can be downloaded again (see RECOVERY.md).
+- Market data (`data/`) is git-ignored. It can be downloaded again (see [SETUP.md](../SETUP.md)).
